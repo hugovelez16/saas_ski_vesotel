@@ -100,6 +100,7 @@ else:
     # Default for local development
     origins = [
         "https://172.20.10.120:4400",
+        "https://clases.vesotel.com",
         "https://clasesski.vesotel.com"
     ]
 
