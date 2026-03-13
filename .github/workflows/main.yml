@@ -72,6 +72,20 @@ jobs:
           # Bajar las nuevas imágenes desde GHCR
           docker compose -f docker-compose.prod.yml pull
 
+          # Levantar la base de datos primero para que esté disponible
+          docker compose -f docker-compose.prod.yml up -d postgres
+
+          # Esperar a que la base de datos esté lista para aceptar conexiones
+          echo "Esperando a que la base de datos esté lista..."
+          for i in {1..10}; do
+            if docker compose -f docker-compose.prod.yml exec -T postgres pg_isready; then
+              echo "¡Base de datos lista!"
+              break
+            fi
+            echo "Esperando..."
+            sleep 5
+          done
+
           # Ejecutar migraciones en contenedor temporal (Seguridad)
           docker compose -f docker-compose.prod.yml run --rm backend python3 -m alembic upgrade head
 
