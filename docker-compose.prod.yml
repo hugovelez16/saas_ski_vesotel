@@ -7,8 +7,6 @@ services:
       - .env
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
     networks:
       - db
     restart: unless-stopped
@@ -49,8 +47,6 @@ services:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
       PGADMIN_CONFIG_SERVER_MODE: 'False' # Modo escritorio sencillo
-    ports:
-      - "5050:80" 
     depends_on:
       - postgres
     networks:
@@ -65,3 +61,4 @@ networks:
     driver: bridge
   db:
     driver: bridge
+    internal: true
