@@ -69,8 +69,10 @@ jobs:
 
       - name: Actualizar y Desplegar
         run: |
-          # Crear/Actualizar el archivo .env desde secretos
-          echo "${{ secrets.ENV_PROD }}" > .env
+          # Crear/Actualizar el archivo .env desde secretos (Usamos 'EOF' para evitar fallos de comillas internas)
+          cat << 'EOF' > .env
+          ${{ secrets.ENV_PROD }}
+          EOF
           echo "GITHUB_REPOSITORY=${{ github.repository }}" >> .env
           
           # Añadir ALLOWED_ORIGINS solo si el secreto existe (evita re-generar todo el .env)
