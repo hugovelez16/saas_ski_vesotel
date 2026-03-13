@@ -1,7 +1,9 @@
 name: Despliegue Seguro (GHCR + SSH)
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - main
 
 env:
   REGISTRY: ghcr.io
