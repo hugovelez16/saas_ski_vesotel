@@ -69,10 +69,14 @@ jobs:
       - name: Actualizar y Desplegar
         run: |
           # Crear/Actualizar el archivo .env desde secretos
-          cat << EOF > .env
-          ${{ secrets.ENV_PROD }}
-          GITHUB_REPOSITORY=${{ github.repository }}
-          EOF
+          echo "${{ secrets.ENV_PROD }}" > .env
+          echo "GITHUB_REPOSITORY=${{ github.repository }}" >> .env
+          
+          # Añadir ALLOWED_ORIGINS solo si el secreto existe (evita re-generar todo el .env)
+          if [ -n "${{ secrets.ALLOWED_ORIGINS }}" ]; then
+            echo "ALLOWED_ORIGINS=${{ secrets.ALLOWED_ORIGINS }}" >> .env
+          fi
+          
           chmod 600 .env
 
           # Bajar las nuevas imágenes desde GHCR
