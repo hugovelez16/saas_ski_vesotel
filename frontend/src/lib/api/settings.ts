@@ -12,7 +12,7 @@ export const getUserRates = async (companyId?: string): Promise<UserCompanyRate[
         for (const company of companies) {
             if (companyId && company.id !== companyId) continue;
 
-            const myMembership = company.members?.find(m => m.user_id === user.id);
+            const myMembership = company.members?.find(m => m.userId === user.id);
             if (myMembership && myMembership.ratesConfig) {
                 ratesList.push({
                     company_id: company.id,

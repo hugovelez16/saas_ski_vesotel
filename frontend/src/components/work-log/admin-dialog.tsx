@@ -31,7 +31,7 @@ interface AdminCreateWorkLogDialogProps {
 export function AdminCreateWorkLogDialog({ users, allUserSettings, onLogUpdate, children }: AdminCreateWorkLogDialogProps) {
     const [open, setOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
-    const [logType, setLogType] = useState<'particular' | 'tutorial'>('particular');
+    const [logType, setLogType] = useState<string>('particular');
     const [selectedUserId, setSelectedUserId] = useState<string | undefined>(undefined);
     const [formData, setFormData] = useState<Partial<WorkLogCreate>>({
         hasCoordination: false,

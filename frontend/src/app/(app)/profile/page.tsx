@@ -241,7 +241,10 @@ export default function ProfilePage() {
   });
 
   const rateMutation = useMutation({
-    mutationFn: (values: any) => updateUserRates(values),
+    mutationFn: (payload: any) => {
+      const { companyId, ...data } = payload;
+      return updateUserRates(companyId, user!.id, data);
+    },
     onSuccess: () => {
       toast({ title: "Rates updated" });
       queryClient.invalidateQueries({ queryKey: ["rates", selectedCompanyId] });

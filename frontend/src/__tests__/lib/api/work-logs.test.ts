@@ -23,7 +23,7 @@ describe('Work Logs API Client', () => {
 
     describe('getWorkLogs', () => {
         it('should call /work-logs with no params when none provided', async () => {
-            mockedApi.get.mockResolvedValue({ data: [] });
+            (mockedApi.get as any).mockResolvedValue({ data: [] });
 
             const result = await getWorkLogs();
 
@@ -41,7 +41,7 @@ describe('Work Logs API Client', () => {
         });
 
         it('should map camelCase params to snake_case for the backend', async () => {
-            mockedApi.get.mockResolvedValue({ data: [] });
+            (mockedApi.get as any).mockResolvedValue({ data: [] });
 
             await getWorkLogs({
                 companyId: 'comp-1',
@@ -69,7 +69,7 @@ describe('Work Logs API Client', () => {
                 { id: 'wl-1', type: 'particular', userId: 'u-1' },
                 { id: 'wl-2', type: 'tutorial', userId: 'u-2' },
             ];
-            mockedApi.get.mockResolvedValue({ data: mockLogs });
+            (mockedApi.get as any).mockResolvedValue({ data: mockLogs });
 
             const result = await getWorkLogs({ companyId: 'c-1' });
 
@@ -88,7 +88,7 @@ describe('Work Logs API Client', () => {
                 endDate: '2026-01-15',
             };
             const mockResponse = { id: 'wl-new', ...newLog };
-            mockedApi.post.mockResolvedValue({ data: mockResponse });
+            (mockedApi.post as any).mockResolvedValue({ data: mockResponse });
 
             const result = await createWorkLog(newLog);
 
@@ -101,7 +101,7 @@ describe('Work Logs API Client', () => {
         it('should PUT to /work-logs/:id with partial data', async () => {
             const update: Partial<WorkLogCreate> = { description: 'Updated' };
             const mockResponse = { id: 'wl-1', description: 'Updated' };
-            mockedApi.put.mockResolvedValue({ data: mockResponse });
+            (mockedApi.put as any).mockResolvedValue({ data: mockResponse });
 
             const result = await updateWorkLog('wl-1', update);
 
@@ -112,7 +112,7 @@ describe('Work Logs API Client', () => {
 
     describe('deleteWorkLog', () => {
         it('should DELETE /work-logs/:id', async () => {
-            mockedApi.delete.mockResolvedValue({});
+            (mockedApi.delete as any).mockResolvedValue({});
 
             await deleteWorkLog('wl-1');
 
