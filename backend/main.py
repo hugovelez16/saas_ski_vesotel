@@ -94,15 +94,7 @@ async def log_requests(request: Request, call_next):
 
 # CORS Configuration
 allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "")
-if allowed_origins_env:
-    origins = [origin.strip() for origin in allowed_origins_env.split(",")]
-else:
-    # Default for local development
-    origins = [
-        "https://172.20.10.120:4400",
-        "https://clases.vesotel.com",
-        "https://clasesski.vesotel.com"
-    ]
+origins = [origin.strip() for origin in allowed_origins_env.split(",")] if allowed_origins_env else []
 
 app.add_middleware(
     CORSMiddleware,
