@@ -9,6 +9,8 @@ env:
   REGISTRY: ghcr.io
   # Esto se convierte en algo como: ghcr.io/usuario/repo
   IMAGE_BASE: ghcr.io/${{ github.repository }}
+  # Fix para el warning de Node 20 en GitHub Actions
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build-and-push:
