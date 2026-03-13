@@ -1,0 +1,68 @@
+name: ski_dev
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    env_file:
+      - .env
+    networks:
+      - db
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    volumes:
+      - ./backend:/app # MODO DEV: Tus cambios de código se reflejan al instante
+      - /app/node_modules
+    env_file:
+      - .env
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      - postgres
+    networks:
+      - proxy_network
+      - db
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      target: deps
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    env_file:
+      - .env
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    command: npm run dev
+    networks:
+      - proxy_network
+    expose:
+      - "3000"
+    environment:
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+
+  dashboard-db:
+    image: dpage/pgadmin4
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+    networks:
+     - db
+     - proxy_network
+      
+volumes:
+  postgres_data:
+
+networks:
+  db:
+    driver: bridge
+    internal: true
+  proxy_network:
+    external: true

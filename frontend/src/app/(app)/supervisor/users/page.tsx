@@ -1,0 +1,142 @@
+"use client";
+
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { getCompaniesDetailed, updateMemberStatus } from "@/lib/api/companies";
+import { DataTable } from "@/components/ui/data-table";
+import { Switch } from "@/components/ui/switch";
+import { useToast } from "@/hooks/use-toast";
+import { Badge } from "@/components/ui/badge";
+import { Users } from "lucide-react";
+import { useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { ColumnDef } from "@tanstack/react-table";
+
+export default function SupervisorUsersPage() {
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const companyIdParam = searchParams.get("companyId");
+
+    const { toast } = useToast();
+    const queryClient = useQueryClient();
+
+    // Fetch Managed Key Data
+    const { data: companies = [], isLoading } = useQuery({
+        queryFn: getCompaniesDetailed,
+        queryKey: ["companiesDetailed"],
+    });
+
+    const memberStatusMutation = useMutation({
+        mutationFn: ({ companyId, userId, status }: { companyId: string; userId: string; status: string }) =>
+            updateMemberStatus(companyId, userId, status),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["companiesDetailed"] });
+            toast({ title: "Estado membresía actualizado" });
+        },
+        onError: () => toast({ title: "Error al actualizar estado", variant: "destructive" })
+    });
+
+    // Deduplicate Users from Companies and Flatten with Meta
+    const usersWithMeta = useMemo(() => {
+        const map = new Map<string, any>();
+
+        const filteredCompanies = companyIdParam
+            ? companies.filter((c: any) => c.id === companyIdParam)
+            : companies;
+
+        filteredCompanies.forEach((company: any) => {
+            if (!company.members) return;
+            company.members.forEach((member: any) => {
+                if (!map.has(member.userId)) {
+                    map.set(member.userId, {
+                        ...member.user,
+                        _companyId: company.id,
+                        _status: member.is_active ? 'active' : 'inactive',
+                        _role: member.role
+                    });
+                }
+            });
+        });
+        return Array.from(map.values());
+    }, [companies, companyIdParam]);
+
+    const handleToggle = (user: any, checked: boolean) => {
+        if (!user._companyId) return;
+        memberStatusMutation.mutate({
+            companyId: user._companyId,
+            userId: user.id,
+            status: checked ? 'active' : 'rejected'
+        });
+    };
+
+    const columns: ColumnDef<any>[] = [
+        {
+            accessorKey: "first_name",
+            header: "Nombre",
+            cell: ({ row }) => `${row.original.first_name} ${row.original.last_name}`,
+        },
+        {
+            accessorKey: "email",
+            header: "Email",
+        },
+        {
+            accessorKey: "role",
+            header: "Rol",
+            cell: ({ row }) => (
+                <Badge variant={row.original.role === 'admin' ? 'default' : 'secondary'}>
+                    {row.original.role}
+                </Badge>
+            ),
+        },
+        {
+            accessorKey: "is_active_worker",
+            header: "Trabajador",
+            cell: ({ row }) => row.original.is_active_worker ? (
+                <Badge variant="outline" className="border-green-500 text-green-600">SÍ</Badge>
+            ) : <span className="text-muted-foreground text-xs">NO</span>,
+        },
+        {
+            accessorKey: "_status",
+            header: "Estado en Empresa",
+            cell: ({ row }) => {
+                const user = row.original;
+                return (
+                    <div className="flex items-center space-x-2" onClick={(e) => e.stopPropagation()}>
+                        <Switch
+                            checked={user._status === 'active'}
+                            onCheckedChange={(checked) => handleToggle(user, checked)}
+                        />
+                        <span className={user._status === 'active' ? "text-green-600 text-xs font-semibold" : "text-red-600 text-xs font-semibold"}>
+                            {user._status === 'active' ? "Activo" : "Inactivo"}
+                        </span>
+                    </div>
+                );
+            }
+        }
+    ];
+
+    if (isLoading) {
+        return <div className="p-8">Cargando gestión de usuarios...</div>;
+    }
+
+    return (
+        <div className="space-y-6">
+            <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                    <Users className="h-6 w-6 text-indigo-600" />
+                    <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Panel de Supervisión</h1>
+                </div>
+            </div>
+
+            <DataTable
+                columns={columns}
+                data={usersWithMeta}
+                searchKey="email"
+                searchPlaceholder="Buscar por email..."
+                onRowClick={(user) => {
+                    const query = companyIdParam ? `?companyId=${companyIdParam}` : "";
+                    router.push(`/supervisor/users/${user.id}${query}`);
+                }}
+            />
+        </div>
+    );
+}

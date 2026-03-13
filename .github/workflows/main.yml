@@ -1,0 +1,82 @@
+name: Despliegue Seguro (GHCR + SSH)
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  REGISTRY: ghcr.io
+  # Esto se convierte en algo como: ghcr.io/usuario/repo
+  IMAGE_BASE: ghcr.io/${{ github.repository }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@v4
+
+      - name: Iniciar sesión en GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Construir y subir imagen del Backend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: ${{ env.IMAGE_BASE }}/backend:latest
+
+      - name: Construir y subir imagen del Frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: ${{ env.IMAGE_BASE }}/frontend:latest
+          build-args: |
+            # Si no defines el secreto, usará /api por defecto (ideal para reverse proxy)
+            NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL || '/api' }}
+
+  deploy:
+    needs: build-and-push
+    # Usamos tu runner ya instalado para saltar la limitación de la IP pública
+    runs-on: self-hosted
+    steps:
+      - name: Descargar código (Solo para obtener los .yml)
+        uses: actions/checkout@v4
+
+      - name: Iniciar sesión en GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Actualizar y Desplegar
+        run: |
+          # Crear/Actualizar el archivo .env desde secretos
+          cat << EOF > .env
+          ${{ secrets.ENV_PROD }}
+          GITHUB_REPOSITORY=${{ github.repository }}
+          EOF
+          chmod 600 .env
+
+          # Bajar las nuevas imágenes desde GHCR
+          docker compose -f docker-compose.prod.yml pull
+
+          # Ejecutar migraciones en contenedor temporal (Seguridad)
+          docker compose -f docker-compose.prod.yml run --rm backend python3 -m alembic upgrade head
+
+          # Reiniciar servicios con las nuevas imágenes
+          docker compose -f docker-compose.prod.yml up -d
+
+          # Limpieza
+          docker image prune -af

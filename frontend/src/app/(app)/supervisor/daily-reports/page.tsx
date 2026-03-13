@@ -1,0 +1,455 @@
+"use client";
+
+import { useState, useMemo, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { format, addDays, subDays, isSameDay, parseISO, startOfDay } from "date-fns";
+import { getUsers, getUserCompanies } from "@/lib/api/users";
+import { getWorkLogs } from "@/lib/api/work-logs"; // Assuming same API, simpler to fetch all and filter
+import { getCompaniesDetailed, getMyCompanies } from "@/lib/api/companies";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, ArrowUp, ArrowDown } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useRouter, useSearchParams } from "next/navigation";
+import { WorkLogDetailsDialog } from "@/components/work-log/details-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SupervisorAddWorkLogDialog } from "@/components/work-log/supervisor-add-log-dialog";
+import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/context/AuthContext";
+
+export default function SupervisorDailyReportPage() {
+    const { user: currentUser } = useAuth();
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    // Allow pre-selection via URL, similar to Dashboard
+    const initialCompanyId = searchParams.get("companyId");
+
+    const queryClient = useQueryClient();
+    const [date, setDate] = useState<Date>(new Date());
+    const [selectedLog, setSelectedLog] = useState<any>(null);
+    const [selectedCompanyId, setSelectedCompanyId] = useState<string>(initialCompanyId || "");
+
+    // Sync state with URL if it changes (e.g. sidebar navigation)
+    useEffect(() => {
+        if (initialCompanyId) {
+            setSelectedCompanyId(initialCompanyId);
+        }
+    }, [initialCompanyId]);
+
+    // 1. Fetch My Managed Companies
+    const { data: myCompanies = [], isLoading: loadingCompanies } = useQuery({
+        queryFn: getMyCompanies,
+        queryKey: ["myCompanies"],
+    });
+
+    const managedCompanies = useMemo(() => {
+        return myCompanies.filter((c: any) => {
+            const role = (c.role || c.pivot?.role || '').toLowerCase();
+            const isManager = ['manager', 'admin', 'owner', 'supervisor'].includes(role);
+            const canViewReport = c.settings?.features?.worker_daily_report === true;
+            return isManager || canViewReport;
+        });
+    }, [myCompanies]);
+
+    // Auto-select first company if not selected
+    if (!selectedCompanyId && managedCompanies.length > 0) {
+        setSelectedCompanyId(managedCompanies[0].id);
+    }
+
+    // State for Create Dialog (Controlled)
+    const [createLogState, setCreateLogState] = useState<{ open: boolean, data?: Partial<any> }>({ open: false });
+
+    // 2. Fetch Users for the selected company
+    // We can use getCompaniesDetailed to get members of the selected company
+    const { data: companyDetails } = useQuery({
+        queryFn: getCompaniesDetailed,
+        queryKey: ["companiesDetailed"],
+        enabled: !!selectedCompanyId
+    });
+
+    const companyUsers = useMemo(() => {
+        if (!selectedCompanyId || !companyDetails) return [];
+        const company = companyDetails.find((c: any) => c.id === selectedCompanyId);
+        if (!company) return [];
+
+        // Members structure: { user_id, role, status, user: { ... } }
+        return company.members.map((m: any) => ({
+            ...m.user,
+            relationRole: m.role,
+            relationStatus: m.status
+        }));
+    }, [companyDetails, selectedCompanyId]);
+
+
+    // 3. Fetch Logs (We might need to fetch all and filter by companyId and date)
+    // Ideally existing API supports companyId filter.
+    // If getWorkLogs supports { companyId: ... } it's best.
+    const { data: workLogs = [], isLoading: loadingLogs } = useQuery({
+        queryFn: () => getWorkLogs({
+            startDate: format(date, 'yyyy-MM-dd'),
+            endDate: format(date, 'yyyy-MM-dd'),
+            limit: 2000,
+            companyId: selectedCompanyId
+        }),
+        queryKey: ["work-logs-daily-supervisor", date.toISOString().split('T')[0], selectedCompanyId],
+        enabled: !!selectedCompanyId
+    });
+
+    // Manual Sort State
+    const [userOrder, setUserOrder] = useState<string[]>([]);
+
+    // Process Users & Sort
+    const sortedUsers = useMemo(() => {
+        let list = [...companyUsers];
+
+        // Initial Sort: Active -> Inactive -> Managers?
+        // User request: "los activos primero, los inactivos despues, los manager al final"
+        list.sort((a, b) => {
+            const getPriority = (u: any) => {
+                if (u.relationRole === 'manager' || u.relationRole === 'admin') return 3;
+                if (u.relationStatus !== 'active') return 2;
+                return 1;
+            };
+
+            const pA = getPriority(a);
+            const pB = getPriority(b);
+            if (pA !== pB) return pA - pB;
+
+            return (a.first_name || "").localeCompare(b.first_name || "");
+        });
+
+        // Apply Manual Override
+        if (userOrder.length > 0) {
+            list.sort((a, b) => {
+                const idxA = userOrder.indexOf(a.id);
+                const idxB = userOrder.indexOf(b.id);
+                if (idxA === -1 && idxB === -1) return 0;
+                if (idxA === -1) return 1;
+                if (idxB === -1) return -1;
+                return idxA - idxB;
+            });
+        }
+
+        return list;
+    }, [companyUsers, userOrder]);
+
+    const moveUser = (userId: string, direction: 'up' | 'down') => {
+        const currentOrder = userOrder.length > 0 ? userOrder : sortedUsers.map(u => u.id);
+        const idx = currentOrder.indexOf(userId);
+        if (idx === -1) return;
+
+        const newOrder = [...currentOrder];
+        if (direction === 'up' && idx > 0) {
+            [newOrder[idx], newOrder[idx - 1]] = [newOrder[idx - 1], newOrder[idx]];
+        }
+        if (direction === 'down' && idx < newOrder.length - 1) {
+            [newOrder[idx], newOrder[idx + 1]] = [newOrder[idx + 1], newOrder[idx]];
+        }
+        setUserOrder(newOrder);
+    };
+
+    const hours = Array.from({ length: 12 }, (_, i) => i + 8);
+
+    const getLogsForUserAndDate = (userId: string) => {
+        return workLogs.filter((log: any) => {
+            // Must match user AND company (already filtered by API hopefully, but double check)
+            if (log.userId !== userId) return false;
+            if (log.companyId && log.companyId !== selectedCompanyId) return false;
+
+            const logDate = log.date ? parseISO(log.date) : (log.startDate ? parseISO(log.startDate) : null);
+            if (!logDate) return false;
+
+            if (log.type === 'tutorial' && log.startDate && log.endDate) {
+                const s = startOfDay(parseISO(log.startDate));
+                const e = startOfDay(parseISO(log.endDate));
+                const currentDay = startOfDay(date);
+                return currentDay >= s && currentDay <= e;
+            }
+
+            return isSameDay(logDate, date);
+        });
+    };
+
+    if (loadingCompanies) return <div className="p-8">Loading...</div>;
+
+    return (
+        <div className="space-y-6">
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                <div>
+                    <h1 className="text-2xl font-bold">Parte Diario</h1>
+                    <p className="text-muted-foreground text-sm">Overview of daily activities.</p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
+                    <div className="flex items-center gap-2">
+                        {selectedCompanyId && (
+                            <Button onClick={() => setCreateLogState({ open: true, data: { companyId: selectedCompanyId } })}>
+                                Add Log
+                            </Button>
+                        )}
+
+                        <Button variant="outline" size="sm" onClick={() => setDate(new Date())}>
+                            Today
+                        </Button>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <Button variant="outline" size="icon" onClick={() => setDate(subDays(date, 1))}>
+                            <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button variant="outline" className={cn("w-auto sm:w-[200px] justify-start text-left font-normal", !date && "text-muted-foreground")}>
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {date ? format(date, "PPP") : <span>Pick a date</span>}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                                <Calendar mode="single" selected={date} onSelect={(d) => d && setDate(d)} initialFocus />
+                            </PopoverContent>
+                        </Popover>
+                        <Button variant="outline" size="icon" onClick={() => setDate(addDays(date, 1))}>
+                            <ChevronRight className="h-4 w-4" />
+                        </Button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Matrix View */}
+            {selectedCompanyId ? (
+                <div className="border rounded-lg overflow-x-auto overscroll-x-none bg-card shadow-sm">
+                    <div className="min-w-[1000px]">
+                        {/* Header Row */}
+                        <div className="flex border-b bg-muted h-10 divide-x">
+                            <div className="w-12 md:w-64 flex-shrink-0 p-2 font-medium text-sm flex items-center justify-center md:justify-start sticky left-0 bg-muted z-30 shadow-[1px_0_5px_rgba(0,0,0,0.05)]">
+                                <span className="md:hidden">#</span>
+                                <span className="hidden md:inline">User</span>
+                            </div>
+                            {/* Mobile Name Column Header */}
+                            <div className="md:hidden min-w-[120px] p-2 text-xs font-medium border-r flex items-center bg-muted/20">Name</div>
+                            {hours.map(h => (
+                                <div key={h} className="flex-1 min-w-[50px] text-center text-xs p-2 border-r last:border-r-0">
+                                    {h}:00
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* User Rows */}
+                        {sortedUsers.map(user => {
+                            const logs = getLogsForUserAndDate(user.id);
+                            return (
+                                <div key={user.id} className="flex border-b last:border-b-0 hover:bg-muted/5 divide-x group">
+                                    <div className="w-12 md:w-64 flex-shrink-0 p-2 flex items-center gap-2 sticky left-0 bg-background z-30 group-hover:bg-muted/10 border-r shadow-[1px_0_5px_rgba(0,0,0,0.05)]">
+                                        <div className="hidden md:flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button onClick={() => moveUser(user.id, 'up')} className="h-4 w-4 hover:bg-muted rounded"><ArrowUp size={12} /></button>
+                                            <button onClick={() => moveUser(user.id, 'down')} className="h-4 w-4 hover:bg-muted rounded"><ArrowDown size={12} /></button>
+                                        </div>
+
+                                        {/* Mobile View: Initials */}
+                                        <div
+                                            className={cn("md:hidden w-full h-full flex items-center justify-center", currentUser?.is_supervisor ? "cursor-pointer" : "cursor-default")}
+                                            onClick={() => currentUser?.is_supervisor && router.push(`/supervisor/users/${user.id}`)}
+                                        >
+                                            <div className={cn(
+                                                "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border",
+                                                user.relationStatus === 'active' ? "bg-green-100 text-green-700 border-green-200" : "bg-red-100 text-red-700 border-red-200"
+                                            )}>
+                                                {(user.first_name?.[0] || "")}{(user.last_name?.[0] || "")}
+                                            </div>
+                                        </div>
+
+                                        {/* Desktop View: Full Details */}
+                                        <div
+                                            className={cn("hidden md:block hover:underline truncate flex-1", currentUser?.is_supervisor ? "cursor-pointer" : "cursor-default")}
+                                            onClick={() => currentUser?.is_supervisor && router.push(`/supervisor/users/${user.id}`)}
+                                        >
+                                            <span className="font-medium text-sm">{user.first_name} {user.last_name}</span>
+                                            <div className="flex gap-1 mt-1">
+                                                {user.relationStatus === 'active' ?
+                                                    <div className="w-2 h-2 rounded-full bg-green-500" title="Active" /> :
+                                                    <div className="w-2 h-2 rounded-full bg-red-400" title="Inactive" />
+                                                }
+                                                {(user.relationRole !== 'user' && user.relationRole) && <Badge variant="outline" className="text-[10px] px-1 py-0 h-4">{user.relationRole}</Badge>}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Mobile Name Column */}
+                                    <div className="md:hidden min-w-[120px] p-2 text-xs border-r flex items-center truncate bg-slate-50/50 text-muted-foreground">
+                                        {user.first_name} {user.last_name}
+                                    </div>
+
+                                    <div className="flex-1 relative h-12 flex">
+                                        {/* Clickable Grid Background */}
+                                        {hours.map(h => (
+                                            <div
+                                                key={h}
+                                                className="flex-1 border-r border-slate-100 last:border-r-0 hover:bg-blue-50/50 cursor-pointer transition-colors"
+                                                onClick={() => setCreateLogState({
+                                                    open: true,
+                                                    data: {
+                                                        userId: user.id,
+                                                        companyId: selectedCompanyId,
+                                                        date: format(date, 'yyyy-MM-dd'),
+                                                        startTime: `${h.toString().padStart(2, '0')}:00`,
+                                                        endTime: `${(h + 1).toString().padStart(2, '0')}:00`,
+                                                        type: 'particular'
+                                                    }
+                                                })}
+                                                title={`Add log for ${h}:00`}
+                                            />
+                                        ))}
+
+                                        {/* Logs Overlay */}
+                                        <div className="absolute inset-0 pointer-events-none">
+                                            {logs.map((log: any) => {
+                                                let startDecimal = 8;
+                                                let endDecimal = 19;
+
+                                                if (log.type === 'particular' && log.startTime && log.endTime) {
+                                                    const [sh, sm] = log.startTime.split(':').map(Number);
+                                                    const [eh, em] = log.endTime.split(':').map(Number);
+                                                    startDecimal = sh + sm / 60;
+                                                    endDecimal = eh + em / 60;
+                                                } else if (log.type === 'tutorial') {
+                                                    startDecimal = 9;
+                                                    endDecimal = 16;
+                                                }
+
+                                                // Bounds Check (8:00 to 20:00)
+                                                if (endDecimal < 8 || startDecimal > 20) return null;
+
+                                                const visibleStart = Math.max(startDecimal, 8);
+                                                const visibleEnd = Math.min(endDecimal, 20);
+                                                const totalHours = 12; // 8:00 to 20:00
+
+                                                // Calculate %
+                                                const offset = ((visibleStart - 8) / totalHours) * 100;
+                                                const duration = ((visibleEnd - visibleStart) / totalHours) * 100;
+
+
+                                                return (
+                                                    <div
+                                                        key={log.id}
+                                                        className={cn(
+                                                            "absolute top-1 bottom-1 rounded-sm text-xs flex items-center justify-start px-2 cursor-pointer hover:brightness-95 transition-all text-white font-bold overflow-visible whitespace-nowrap pointer-events-auto z-20",
+                                                            log.type === 'tutorial' ? "bg-purple-500 opacity-80" : "bg-blue-600"
+                                                        )}
+                                                        style={{ left: `${offset}%`, width: `${duration}%` }}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation(); // Prevent grid click
+                                                            setSelectedLog(log);
+                                                        }}
+                                                        title={`${log.description || 'Work Log'} (${log.startTime} - ${log.endTime})`}
+                                                    >
+                                                        {log.client || log.description || 'Log'}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            ) : (
+                <div className="text-center py-12 text-muted-foreground border rounded bg-slate-50">
+                    Please select a company to view the report.
+                </div>
+            )}
+
+            <WorkLogDetailsDialog
+                log={selectedLog}
+                open={!!selectedLog}
+                onOpenChange={(open) => !open && setSelectedLog(null)}
+                userSettings={null}
+            />
+
+            {/* Create Dialog */}
+            {selectedCompanyId && (
+                <SupervisorAddWorkLogDialog
+                    open={createLogState.open}
+                    onOpenChange={(open) => setCreateLogState(prev => ({ ...prev, open }))}
+                    initialData={createLogState.data}
+                    companyId={selectedCompanyId}
+                    companyName={managedCompanies.find(c => c.id === selectedCompanyId)?.name || "Company"}
+                    users={companyUsers}
+                    onLogUpdate={() => {
+                        queryClient.invalidateQueries({ queryKey: ["work-logs-daily-supervisor"] });
+                        setCreateLogState({ open: false });
+                    }}
+                >
+                    {/* Explicitly pass empty children or null to prevent default button rendering if the component logic dictates it, 
+                       but actually I am just removing the OLD invocation if it exists. 
+                       Wait, the user sees a button at the bottom. 
+                       Looking at previous file content, I see:
+                       
+                       {selectedCompanyId && (
+                        <SupervisorAddWorkLogDialog
+                            companyId={selectedCompanyId}
+                            ...
+                        />
+                       )}
+                       
+                       at lines 170-179 (Top Header) - which I REPLACED with a Button that sets state.
+                       
+                       AND another one at lines 312-321 (Bottom) - which acts as the Dialog instance.
+                       
+                       BUT wait, the user image shows:
+                       Top Right: "Add Log" (Black button)
+                       Bottom Left: "Añadir Registro" (Black button with Plus Icon)
+                       
+                       The "Añadir Registro" button comes from the default trigger of SupervisorAddWorkLogDialog if no children are passed.
+                       
+                       I need to ensure the Dialog instance at the bottom DOES NOT render a trigger button.
+                       I checked my change in previous turn...
+                       
+                       Turn 616:
+                       I added `children?: React.ReactNode` and support for external control.
+                       Original code:
+                       <DialogTrigger asChild>
+                           {children ?? (
+                               <Button> ... Añadir Registro ... </Button>
+                           )}
+                       </DialogTrigger>
+                       
+                       So if I pass `children={<></>}` or `children={null}` it might render nothing as trigger?
+                       Wait, DialogTrigger requires a child element to bind props to if asChild is true.
+                       If I want NO trigger (controlled only), I should wrap it or adjust component.
+                       
+                       Actually, looking at `SupervisorAddWorkLogDialog`:
+                       Wrapper is:
+                       <Dialog open={open} ...>
+                           <DialogTrigger asChild> ... </DialogTrigger>
+                           
+                       If `open` is controlled, we might not need a Trigger if we open it via state.
+                       But typical shadcn Dialog pattern expects a trigger or consistent structure.
+                       
+                       However, I can just pass a hidden element as children?
+                       <span className="hidden" />
+                       
+                       Let's check the bottom invocation in `page.tsx`:
+                       It is:
+                        <SupervisorAddWorkLogDialog
+                            open={createLogState.open}
+                            ...
+                        />
+                        
+                       It has no children prop. So it renders the default "Añadir Registro" button.
+                       
+                       I will modify the bottom invocation to pass a hidden trigger or adjust the component to support "no trigger" mode better, 
+                       but passing a hidden span is easiest without changing component again.
+                       
+                       OR better: The top button "Add Log" calls `setCreateLogState({ open: true })`.
+                       So the bottom dialog IS the responding component.
+                       I just need to hide its trigger.
+                   */}
+                    <span className="hidden" />
+                </SupervisorAddWorkLogDialog>
+            )}
+        </div>
+    );
+}

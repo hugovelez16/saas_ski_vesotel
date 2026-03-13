@@ -1,0 +1,66 @@
+name: ski_prod
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    env_file:
+      - .env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - db
+    restart: unless-stopped
+
+  backend:
+    # La imagen se construye en GitHub y se descarga desde GHCR
+    image: ghcr.io/${GITHUB_REPOSITORY}/backend:latest
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+    networks:
+      - app
+      - db
+    restart: unless-stopped
+
+  frontend:
+    # La imagen se construye en GitHub y se descarga desde GHCR
+    image: ghcr.io/${GITHUB_REPOSITORY}/frontend:latest
+    env_file:
+      - .env
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - app
+    restart: unless-stopped
+
+  dashboard-db: # <--- Este es tu pgAdmin
+    image: dpage/pgadmin4
+    env_file:
+      - .env
+    environment:
+      # Las toma de tu .env automáticamente
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+      PGADMIN_CONFIG_SERVER_MODE: 'False' # Modo escritorio sencillo
+    ports:
+      - "5050:80" 
+    depends_on:
+      - postgres
+    networks:
+      - db
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  app:
+    driver: bridge
+  db:
+    driver: bridge
+    internal: true
