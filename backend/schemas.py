@@ -84,6 +84,7 @@ class UserResponse(UserBase):
     role: str
     is_active: bool
     is_supervisor: bool = False # Computed
+    is_active_worker: bool = False # Computed
     must_change_password: bool = False
     is_2fa_enabled: bool = False # TOTP status
     default_company_id: Optional[UUID] = None
@@ -169,9 +170,9 @@ class CompanyResponse(Company):
     pass
 
 
-class CompanyMemberBase(BaseModel):
+class CompanyMemberBase(CamelModel):
     role: str = "worker"
-    is_active: bool = True
+    is_active: bool = Field(True, alias="is_active") # Keep snake_case as used in frontend
     rates_config: Optional[Dict[str, Any]] = Field(None, alias="ratesConfig")
     settings: Optional[Dict[str, Any]] = None
 
@@ -182,13 +183,10 @@ class CompanyMemberUpdate(BaseModel):
     settings: Optional[Dict[str, Any]] = None
 
 class CompanyMemberResponse(CompanyMemberBase):
-    user_id: UUID
-    company_id: UUID
-    joined_at: datetime
+    user_id: UUID = Field(..., alias="userId")
+    company_id: UUID = Field(..., alias="companyId")
+    joined_at: datetime = Field(..., alias="joinedAt")
     user: Optional[UserResponse] = None
-    
-    class Config:
-        from_attributes = True
 
 class CompanyWithMembers(CompanyResponse):
     members: List[CompanyMemberResponse] = []

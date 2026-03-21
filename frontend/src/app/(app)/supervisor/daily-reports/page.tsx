@@ -48,7 +48,9 @@ export default function SupervisorDailyReportPage() {
         return myCompanies.filter((c: any) => {
             const role = (c.role || c.pivot?.role || '').toLowerCase();
             const isManager = ['manager', 'admin', 'owner', 'supervisor'].includes(role);
-            const canViewReport = c.settings?.features?.worker_daily_report === true;
+            const settings = c.settings || {};
+            // Support both new 'modules' and legacy 'features'
+            const canViewReport = (settings.modules?.worker_daily_report ?? settings.features?.worker_daily_report ?? true) === true;
             return isManager || canViewReport;
         });
     }, [myCompanies]);
@@ -78,7 +80,7 @@ export default function SupervisorDailyReportPage() {
         return company.members.map((m: any) => ({
             ...m.user,
             relationRole: m.role,
-            relationStatus: m.status
+            relationIsActive: m.is_active
         }));
     }, [companyDetails, selectedCompanyId]);
 
@@ -109,7 +111,7 @@ export default function SupervisorDailyReportPage() {
         list.sort((a, b) => {
             const getPriority = (u: any) => {
                 if (u.relationRole === 'manager' || u.relationRole === 'admin') return 3;
-                if (u.relationStatus !== 'active') return 2;
+                if (!u.relationIsActive) return 2;
                 return 1;
             };
 
@@ -254,7 +256,7 @@ export default function SupervisorDailyReportPage() {
                                         >
                                             <div className={cn(
                                                 "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border",
-                                                user.relationStatus === 'active' ? "bg-green-100 text-green-700 border-green-200" : "bg-red-100 text-red-700 border-red-200"
+                                                user.relationIsActive ? "bg-green-100 text-green-700 border-green-200" : "bg-red-100 text-red-700 border-red-200"
                                             )}>
                                                 {(user.first_name?.[0] || "")}{(user.last_name?.[0] || "")}
                                             </div>
@@ -267,7 +269,7 @@ export default function SupervisorDailyReportPage() {
                                         >
                                             <span className="font-medium text-sm">{user.first_name} {user.last_name}</span>
                                             <div className="flex gap-1 mt-1">
-                                                {user.relationStatus === 'active' ?
+                                                {user.relationIsActive ?
                                                     <div className="w-2 h-2 rounded-full bg-green-500" title="Active" /> :
                                                     <div className="w-2 h-2 rounded-full bg-red-400" title="Inactive" />
                                                 }

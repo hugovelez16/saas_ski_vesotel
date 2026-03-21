@@ -44,13 +44,30 @@ export interface Company {
 export type CompanyResponse = Company;
 
 export interface CompanySettings {
-    features?: {
-        tutorials?: boolean;
-        coordination?: boolean;
-        night_shifts?: boolean;
-        [key: string]: boolean | undefined;
+    modules?: Record<string, boolean>;
+    business_logic?: {
+        price_type?: 'net' | 'gross';
+        cost_markup?: number;
     };
-    [key: string]: any;
+    worker_experience?: {
+        input_mode?: 'manual_single' | 'timer' | 'bulk';
+        allow_manual_amount?: boolean;
+    };
+    ui_customization?: {
+        labels?: {
+            worklog?: string;
+            client?: string;
+        };
+    };
+    // Legacy support (to be removed after complete migration)
+    /** @deprecated Use modules instead */
+    features?: Record<string, boolean>;
+    /** @deprecated Use business_logic.price_type instead */
+    billing?: {
+        price_type?: 'net' | 'gross';
+    };
+    /** @deprecated Use worker_experience.input_mode instead */
+    input_mode?: 'manual_single' | 'timer' | 'bulk';
 }
 
 /**
@@ -159,10 +176,10 @@ export interface WorkLogBulkCreate extends Omit<WorkLogCreate, 'userId'> {
  * Authentication & Sessions
  */
 export interface Token {
-    accessToken: string;
-    tokenType: string;
-    requires2fa?: boolean;
-    deviceToken?: string;
+    access_token: string;
+    token_type: string;
+    requires_2fa?: boolean;
+    device_token?: string;
 }
 
 export interface Session {

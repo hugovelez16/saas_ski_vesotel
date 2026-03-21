@@ -34,21 +34,54 @@ export default function ReportsPage() {
     const isAdmin = user?.role === 'admin';
 
     // -- Queries -- 
-    // Admin gets ALL companies, regular users get THEIR companies
     const { data: companies = [] } = useQuery({
         queryFn: isAdmin ? getCompaniesDetailed : getMyCompanies,
         queryKey: isAdmin ? ['allCompanies'] : ['myCompanies'],
         enabled: !!user
     });
 
+    // -- Accessible Companies (Modules Filter) --
+    const accessibleCompanies = useMemo(() => {
+        if (isAdmin) return companies;
+        return companies.filter(c => {
+            const modules = c.settings?.modules || {};
+            const reportsConfig = modules.reports;
+
+            // 1. Basic check
+            if (!reportsConfig) return false;
+
+            // 2. Boolean mode
+            if (typeof reportsConfig === 'boolean') return reportsConfig;
+
+            // 3. Object mode (Advanced SaaS settings)
+            if (typeof reportsConfig === 'object') {
+                if (reportsConfig.enabled === false) return false;
+                
+                if (reportsConfig.access_level === 'managers') {
+                    const role = String(c.role || '').toLowerCase();
+                    return ['manager', 'admin', 'owner'].includes(role);
+                }
+                return true; // All members allowed if not specified
+            }
+            return false;
+        });
+    }, [companies, isAdmin]);
+
     const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
 
-    // Effect to select first company by default (only for non-admins to avoid loading huge lists initially)
+    // Effect to select default company
     useMemo(() => {
-        if (!isAdmin && companies.length > 0 && !selectedCompanyId) {
-            setSelectedCompanyId(companies[0].id);
+        if (accessibleCompanies.length > 0 && !selectedCompanyId) {
+            if (user?.default_company_id) {
+                const exists = accessibleCompanies.find(c => c.id === user.default_company_id);
+                if (exists) {
+                    setSelectedCompanyId(user.default_company_id);
+                    return;
+                }
+            }
+            setSelectedCompanyId(accessibleCompanies[0].id);
         }
-    }, [companies, isAdmin]);
+    }, [accessibleCompanies, selectedCompanyId, user?.default_company_id]);
 
     // Fetch members/users
     // If Admin and NO company selected -> Get ALL Users
@@ -63,7 +96,7 @@ export default function ReportsPage() {
             return [];
         },
         queryKey: ['reportUsers', selectedCompanyId, isAdmin],
-        enabled: (isAdmin && selectedCompanyId === "all") || (!!selectedCompanyId && selectedCompanyId !== "all")
+        enabled: !!selectedCompanyId
     });
 
     // Normalize users list for the selector
@@ -110,19 +143,51 @@ export default function ReportsPage() {
         to: new Date()
     });
 
+    const isAdminOrSupervisor = useMemo(() => {
+        if (!user) return false;
+        if (user.role === 'admin') return true;
+        if (selectedCompanyId) {
+            const company = companies.find(c => c.id === selectedCompanyId);
+            const role = String(company?.role || '').toLowerCase();
+            return ['manager', 'admin', 'owner'].includes(role);
+        }
+        return false;
+    }, [user, companies, selectedCompanyId]);
+
+    // Force individual mode for non-supervisors
+    useMemo(() => {
+        if (!isAdminOrSupervisor) {
+            setReportType('individual');
+            setSelectedUserId('me');
+        }
+    }, [isAdminOrSupervisor]);
+
     // Text Summary State
     const [textDialogOpen, setTextDialogOpen] = useState(false);
     const [generatedText, setGeneratedText] = useState("");
 
-    const isAdminOrSupervisor = useMemo(() => {
-        if (!user) return false;
-        if (user.role === 'admin') return true;
-        if (selectedCompanyId && selectedCompanyId !== "all") {
-            const company = companies.find(c => c.id === selectedCompanyId);
-            return company?.role === 'manager' || company?.role === 'admin';
-        }
-        return false;
-    }, [user, companies, selectedCompanyId]);
+    // Fallback UI if no accessible companies
+    if (user && accessibleCompanies.length === 0) {
+        return (
+            <div className="container mx-auto py-8 max-w-3xl px-4 text-center">
+                <h1 className="text-3xl font-bold mb-8">Informes</h1>
+                <Card className="p-12">
+                    <div className="flex flex-col items-center gap-4">
+                        <AlertCircle className="h-12 w-12 text-muted-foreground" />
+                        <CardTitle>Módulo de informes no habilitado</CardTitle>
+                        <CardDescription>
+                            No tienes acceso al módulo de informes en ninguna de tus empresas actuales. 
+                            Contacta con tu administrador para solicitar acceso.
+                        </CardDescription>
+                        <Button variant="outline" onClick={() => router.push('/dashboard')}>
+                            Volver al Dashboard
+                        </Button>
+                    </div>
+                </Card>
+            </div>
+        );
+    }
+
 
 
     const generateSeasons = () => {
@@ -152,7 +217,7 @@ export default function ReportsPage() {
         // Determine context prefix
         let prefix = "Report";
         if (reportType === "company") {
-            const cName = selectedCompanyId === 'all' ? 'Global' : companies.find(c => c.id === selectedCompanyId)?.name || 'Company';
+            const cName = companies.find(c => c.id === selectedCompanyId)?.name || 'Company';
             prefix = `CompanyReport_${cName.replace(/\s+/g, '')}`;
         } else if (selectedUserId !== "me") {
             const u = userOptions.find(m => m.id === selectedUserId);
@@ -208,8 +273,7 @@ export default function ReportsPage() {
             if (selectedUserId !== 'me') {
                 params.user_id = selectedUserId;
             }
-            // Filter by company if selected and not ALL
-            if (selectedCompanyId && selectedCompanyId !== 'all') {
+            if (selectedCompanyId) {
                 params.company_id = selectedCompanyId;
             }
         }
@@ -279,9 +343,7 @@ export default function ReportsPage() {
                     totalDays: stat.dates.size
                 }));
 
-                const company = selectedCompanyId === 'all'
-                    ? { id: 'all', name: 'Global / Todas las Empresas', settings: {} } as any
-                    : companies.find(c => c.id === selectedCompanyId) || { id: '0', name: 'Company', settings: {} } as any;
+                const company = companies.find(c => c.id === selectedCompanyId) || { id: '0', name: 'Company', settings: {} } as any;
 
                 blob = await pdf(
                     <CompanyPDFReport
@@ -549,8 +611,7 @@ export default function ReportsPage() {
                                 <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
                                     <SelectTrigger><SelectValue placeholder="Seleccionar empresa" /></SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="all">Todas las Empresas</SelectItem>
-                                        {companies.map(c => (
+                                        {accessibleCompanies.map(c => (
                                             <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                                         ))}
                                     </SelectContent>

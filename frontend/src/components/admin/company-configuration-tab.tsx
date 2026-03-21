@@ -7,12 +7,17 @@ import { updateCompany } from "@/lib/api/companies";
 import { Loader2 } from "lucide-react";
 import { WorklogDefinitionBuilder } from "@/components/admin/worklog-definition-builder";
 import { TaxConfigBuilder } from "@/components/admin/tax-config-builder";
+import { FeatureFlagsBuilder } from "@/components/admin/feature-flags-builder";
+import { BusinessLogicBuilder } from "@/components/admin/business-logic-builder";
+import { WorkerUXBuilder } from "@/components/admin/worker-ux-builder";
+import { useAuth } from "@/context/AuthContext";
 
 interface CompanyConfigurationTabProps {
     company: any;
 }
 
 export function CompanyConfigurationTab({ company }: CompanyConfigurationTabProps) {
+    const { user } = useAuth();
     const { toast } = useToast();
     const queryClient = useQueryClient();
 
@@ -20,57 +25,90 @@ export function CompanyConfigurationTab({ company }: CompanyConfigurationTabProp
         mutationFn: (data: any) => updateCompany(company.id, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["companiesDetailed"] });
-            toast({ title: "Configuration saved successfully" });
+            toast({ title: "Configuración guardada correctamente" });
         },
         onError: () => {
-            toast({ title: "Failed to save configuration", variant: "destructive" });
+            toast({ title: "Error al guardar la configuración", variant: "destructive" });
         }
     });
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Configuración Avanzada (JSON)</CardTitle>
-                <CardDescription>Personaliza los tipos de partes y los impuestos a nivel de empresa.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-8">
+        <div className="space-y-8">
+            {/* 1. Módulos y Funcionalidades */}
+            <Card className="border-indigo-100 shadow-sm">
+                <CardHeader className="bg-indigo-50/30">
+                    <CardTitle className="text-xl">Módulos del Sistema</CardTitle>
+                    <CardDescription>Activa o desactiva módulos premium y funcionalidades globales para esta empresa.</CardDescription>
+                </CardHeader>
+                <CardContent className="pt-6">
+                    <FeatureFlagsBuilder
+                        initialValue={company.settings || {}}
+                        onSave={(val) => mutation.mutate({ settings: val })}
+                    />
+                </CardContent>
+            </Card>
 
-                <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                        <div>
-                            <h3 className="text-lg font-medium">Definición de Partes de Trabajo</h3>
-                            <p className="text-sm text-muted-foreground">Configura visualmente qué turnos existen y qué campos se piden al trabajador.</p>
+            {/* 2. Lógica de Negocio y Económica */}
+            <Card className="border-slate-200 shadow-sm">
+                <CardHeader className="bg-slate-50/50">
+                    <CardTitle className="text-xl">Reglas de Negocio</CardTitle>
+                    <CardDescription>Configura cómo se procesan los cálculos económicos y la facturación.</CardDescription>
+                </CardHeader>
+                <CardContent className="pt-6">
+                    <BusinessLogicBuilder
+                        initialValue={company.settings || {}}
+                        onSave={(val) => mutation.mutate({ settings: val })}
+                    />
+                </CardContent>
+            </Card>
+
+            {/* 3. Panel del Trabajador */}
+            <Card className="border-slate-200 shadow-sm">
+                <CardHeader className="bg-slate-50/50">
+                    <CardTitle className="text-xl">Experiencia del Trabajador</CardTitle>
+                    <CardDescription>Controla qué pueden hacer los empleados y cómo interactúan con la App.</CardDescription>
+                </CardHeader>
+                <CardContent className="pt-6">
+                    <WorkerUXBuilder
+                        initialValue={company.settings || {}}
+                        onSave={(val) => mutation.mutate({ settings: val })}
+                    />
+                </CardContent>
+            </Card>
+
+            {/* 4. Definiciones de Datos (Legacy/Existing) - Only for Platform Admin */}
+            {user?.role === 'admin' && (
+                <Card className="border-slate-200 shadow-sm">
+                    <CardHeader className="bg-slate-50/50">
+                        <CardTitle className="text-xl">Definiciones Técnicas</CardTitle>
+                        <CardDescription>Configura los tipos de jornada y las tasas de impuestos globales.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-10 pt-6">
+                        <div className="space-y-4">
+                            <h3 className="text-lg font-bold">Partes de Trabajo</h3>
+                            <WorklogDefinitionBuilder
+                                initialValue={company.worklogDefinitions || {}}
+                                onSave={(val) => mutation.mutate({ worklogDefinitions: val })}
+                            />
                         </div>
-                    </div>
-                    <hr className="my-4" />
-                    <WorklogDefinitionBuilder
-                        initialValue={company.worklogDefinitions || {
-                            "particular": {
-                                "label": "Particular",
-                                "fields": ["description"],
-                                "options": ["coordination"]
-                            }
-                        }}
-                        onSave={(val) => mutation.mutate({ worklogDefinitions: val })}
-                    />
-                </div>
-
-                <div className="space-y-4">
-                    <h3 className="text-lg font-medium">Impuestos Generales (Tasas)</h3>
-                    <p className="text-sm text-muted-foreground">Deducciones globales que se aplicarán si el trabajador no tiene una sobreescritura específica en su perfil.</p>
-                    <hr className="my-4" />
-                    <TaxConfigBuilder
-                        initialValue={company.taxConfig || {}}
-                        onSave={(val) => mutation.mutate({ taxConfig: val })}
-                    />
-                </div>
-
-            </CardContent>
-            {mutation.isPending && (
-                <CardFooter className="flex justify-end gap-2 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-b-lg">
-                    <span className="flex items-center text-sm text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Guardando...</span>
-                </CardFooter>
+                        <hr />
+                        <div className="space-y-4">
+                            <h3 className="text-lg font-bold">Tasas de Impuestos (Default)</h3>
+                            <TaxConfigBuilder
+                                initialValue={company.taxConfig || {}}
+                                onSave={(val) => mutation.mutate({ taxConfig: val })}
+                            />
+                        </div>
+                    </CardContent>
+                </Card>
             )}
-        </Card>
+
+            {mutation.isPending && (
+                <div className="fixed bottom-8 right-8 bg-white p-4 rounded-xl shadow-2xl border border-indigo-100 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4">
+                    <Loader2 className="h-5 w-5 animate-spin text-indigo-600" />
+                    <span className="font-medium">Guardando cambios...</span>
+                </div>
+            )}
+        </div>
     );
 }

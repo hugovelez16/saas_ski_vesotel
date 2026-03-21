@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Suspense } from "react";
 
 function AppLayoutContent({ children }: { children: React.ReactNode }) {
-    const { user, loading } = useAuth();
+    const { user, loading, logout } = useAuth();
     const router = useRouter();
     const searchParams = useSearchParams();
     const currentCompanyId = searchParams.get("companyId");
@@ -52,17 +52,15 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     // Worker Group
     if (user?.is_active_worker || user?.role === 'admin') {
         // Check if any company has worker_daily_report enabled
-        const dailyReportCompanies = myCompanies.filter((c: any) =>
-            c.settings?.features?.worker_daily_report === true
-        );
+        const dailyReportCompanies = myCompanies.filter((c: any) => {
+            const settings = c.settings || {};
+            // Support both new 'modules' and legacy 'features'
+            return (settings.modules?.worker_daily_report ?? settings.features?.worker_daily_report ?? true) === true;
+        });
 
         const items = [...workerNavItems];
 
         if (dailyReportCompanies.length > 0) {
-            // Add link. If multiple, maybe just link to the page and let page handle selection?
-            // User requested: "se le tiene que mostrar en el sidebar el boton de daily report"
-            // We can link to /supervisor/daily-reports (which we'll use for workers too).
-            // Default to first one or generic.
             const targetId = dailyReportCompanies[0].id;
             items.push({
                 href: `/supervisor/daily-reports?companyId=${targetId}`,
@@ -89,15 +87,26 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     const querySuffix = targetCompanyId ? `?companyId=${targetCompanyId}` : "";
 
     if (user?.is_supervisor || user?.role === 'admin') {
+        const activeCompany = myCompanies.find((c: any) => c.id === targetCompanyId);
+        const settings = activeCompany?.settings || {};
+        
+        // Billing is a premium module, so we check 'modules.billing' (or legacy 'features.billing')
+        const isBillingEnabled = (settings.modules?.billing ?? settings.features?.billing) === true;
+
+        const supervisorItems = [
+            { href: `/supervisor/dashboard${querySuffix}`, label: "Dashboard", icon: LayoutDashboard },
+            { href: `/supervisor/daily-reports${querySuffix}`, label: "Parte Diario", icon: FileText },
+            { href: `/supervisor/users${querySuffix}`, label: "Usuarios", icon: Users },
+            { href: `/supervisor/shifts${querySuffix}`, label: "Turnos", icon: Calendar },
+        ];
+
+        if (isBillingEnabled) {
+            supervisorItems.push({ href: `/supervisor/billing${querySuffix}`, label: "Facturación", icon: Banknote });
+        }
+
         navGroups.push({
             label: managedCompanies.length === 1 ? managedCompanies[0].name : "Supervisor",
-            items: [
-                { href: `/supervisor/dashboard${querySuffix}`, label: "Dashboard", icon: LayoutDashboard },
-                { href: `/supervisor/daily-reports${querySuffix}`, label: "Parte Diario", icon: FileText },
-                { href: `/supervisor/users${querySuffix}`, label: "Usuarios", icon: Users },
-                { href: `/supervisor/shifts${querySuffix}`, label: "Turnos", icon: Calendar },
-                { href: `/supervisor/billing${querySuffix}`, label: "Facturación", icon: Banknote },
-            ]
+            items: supervisorItems
         });
     }
 
@@ -109,10 +118,34 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         });
     }
 
-    // Account Group (Common)
+    // Account Group (Common) - Restricted "Informes" to accessible companies
+    const accountItems = [];
+    
+    // Check if reports module is accessible in any company
+    const hasReportsAccess = user?.role === 'admin' || myCompanies.some((c: any) => {
+        const modules = c.settings?.modules || c.settings?.features || {};
+        const reportsConfig = modules.reports; // We'll stick to 'reports' as the primary ID
+
+        if (!reportsConfig) return false;
+        if (typeof reportsConfig === 'boolean') return reportsConfig;
+        if (typeof reportsConfig === 'object') {
+            if (reportsConfig.enabled === false) return false;
+            if (reportsConfig.access_level === 'managers') {
+                const role = String(c.role || '').toLowerCase();
+                return ['manager', 'admin', 'owner'].includes(role);
+            }
+            return true;
+        }
+        return false;
+    });
+
+    if (hasReportsAccess) {
+        accountItems.push(...commonNavItems);
+    }
+
     navGroups.push({
         label: "Account",
-        items: commonNavItems
+        items: accountItems
     });
 
     useEffect(() => {
@@ -121,43 +154,44 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         }
     }, [user, loading, router]);
 
-    useEffect(() => {
-        if (loading || !user || !user.is_supervisor) {
-            setIsCompanyDialogOpen(false);
-            return;
-        }
-
-        // Only enforce on supervisor pages or pages that likely need company context (like reports)
-        // Or broadly enforce for supervisors to ensure context. 
-        // Let's enforce for all current routes provided they are logged in as supervisor.
-        // But avoiding Admin routes if the user is also admin?
-        // Admin routes (/admin) generally don't use the sidebar company switcher in the same way (they manage companies).
-        const pathname = window.location.pathname;
-        if (pathname.startsWith('/admin')) {
-            setIsCompanyDialogOpen(false);
-            return;
-        }
-
-        if (managedCompanies.length > 0 && !currentCompanyId) {
-            if (managedCompanies.length === 1) {
-                // Auto-select
-                const target = managedCompanies[0].id;
-                const params = new URLSearchParams(searchParams.toString());
-                params.set("companyId", target);
-                router.replace(`${pathname}?${params.toString()}`);
-            } else if (managedCompanies.length > 1) {
-                setIsCompanyDialogOpen(true);
-            }
-        } else {
-            setIsCompanyDialogOpen(false);
-        }
-    }, [user, loading, managedCompanies, currentCompanyId, router, searchParams]);
-
     if (loading) {
         return <div className="flex h-screen items-center justify-center">Loading...</div>;
     }
 
     if (!user) return null;
+
+    // "No Company" Warning Screen
+    if (user.role !== 'admin' && myCompanies.length === 0 && !loading) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 p-6 text-center">
+                <div className="max-w-md w-full bg-white p-8 rounded-xl shadow-lg border border-slate-200">
+                    <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <Building2 className="w-8 h-8 text-amber-600" />
+                    </div>
+                    <h1 className="text-2xl font-bold text-slate-900 mb-4">No estás vinculado a ninguna empresa</h1>
+                    <p className="text-slate-600 mb-8">
+                        Para poder acceder al sistema, tu usuario debe estar vinculado a al menos una empresa.
+                        Por favor, ponte en contacto con el administrador para solicitar acceso.
+                    </p>
+                    <div className="bg-slate-50 p-4 rounded-lg border border-slate-100 mb-8">
+                        <p className="text-sm font-medium text-slate-500 uppercase tracking-wider mb-1">Contacto Administrador</p>
+                        <a href="mailto:hugo@vesotel.com" className="text-indigo-600 font-bold hover:underline">
+                            hugo@vesotel.com
+                        </a>
+                    </div>
+                    <Button 
+                        variant="outline" 
+                        onClick={() => {
+                            logout();
+                        }}
+                        className="w-full"
+                    >
+                        Cerrar Sesión
+                    </Button>
+                </div>
+            </div>
+        );
+    }
 
     // Condition for CompanySwitcher: Only if managing more than 1 company
     const showCompanySwitcher = myCompanies.length > 1;

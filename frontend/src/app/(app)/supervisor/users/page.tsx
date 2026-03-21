@@ -79,20 +79,27 @@ export default function SupervisorUsersPage() {
             header: "Email",
         },
         {
-            accessorKey: "role",
+            accessorKey: "_role",
             header: "Rol",
-            cell: ({ row }) => (
-                <Badge variant={row.original.role === 'admin' ? 'default' : 'secondary'}>
-                    {row.original.role}
-                </Badge>
-            ),
-        },
-        {
-            accessorKey: "is_active_worker",
-            header: "Trabajador",
-            cell: ({ row }) => row.original.is_active_worker ? (
-                <Badge variant="outline" className="border-green-500 text-green-600">SÍ</Badge>
-            ) : <span className="text-muted-foreground text-xs">NO</span>,
+            cell: ({ row }) => {
+                const role = row.original._role;
+                const roleMap: Record<string, { label: string, color: string }> = {
+                    admin: { label: 'Admin Empresa', color: 'bg-red-600' },
+                    manager: { label: 'Manager', color: 'bg-indigo-600' },
+                    worker: { label: 'Trabajador', color: 'bg-slate-200 text-slate-700' }
+                };
+                
+                const display = roleMap[role as string] || { label: role, color: 'bg-secondary text-secondary-foreground' };
+                
+                return (
+                    <Badge 
+                        variant={role === 'worker' ? 'secondary' : 'default'}
+                        className={display.color + (role !== 'worker' ? " hover:opacity-90" : "")}
+                    >
+                        {display.label}
+                    </Badge>
+                );
+            },
         },
         {
             accessorKey: "_status",

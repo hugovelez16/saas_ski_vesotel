@@ -9,6 +9,7 @@ services:
       - .env
     networks:
       - db
+      - dashboard-db-network
     restart: unless-stopped
 
   backend:
@@ -21,8 +22,17 @@ services:
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
       - postgres
+      - redis
     networks:
       - proxy_network
+      - db
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
       - db
     restart: unless-stopped
 
@@ -46,16 +56,6 @@ services:
     environment:
       - PORT=3000
       - HOSTNAME=0.0.0.0
-
-  dashboard-db:
-    image: dpage/pgadmin4
-    env_file:
-      - .env
-    depends_on:
-      - postgres
-    networks:
-     - db
-     - proxy_network
       
 volumes:
   postgres_data:
@@ -65,4 +65,6 @@ networks:
     driver: bridge
     internal: true
   proxy_network:
+    external: true
+  dashboard-db-network:
     external: true

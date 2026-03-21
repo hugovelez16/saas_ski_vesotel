@@ -11,8 +11,11 @@ from sqlalchemy.orm import Session, joinedload
 from typing import List, Any
 from uuid import UUID
 from datetime import timedelta, datetime, date
-import crud, models, schemas, auth, email_utils, os
+import crud, models, schemas, auth, email_utils, os, asyncio
 from database import SessionLocal, engine, get_db
+from contextlib import asynccontextmanager
+from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
 # import shopify_routes
 
 # Create tables if they don't exist (Legacy approach, now using Alembic)
@@ -75,10 +78,42 @@ def is_manager_of_company(db: Session, user: models.User, company_id: Any) -> bo
     
     return bool(membership)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Lifespan context manager for FastAPI.
+    Handles startup logic (waiting for DB) and shutdown logic.
+    """
+    # Database readiness check (Wait for DB)
+    # Total timeout: 60 seconds (30 retries * 2 seconds)
+    retries = 30
+    print("Checking database connection...")
+    while retries > 0:
+        try:
+            db = SessionLocal()
+            # Simple query to validate connection
+            db.execute(text("SELECT 1"))
+            db.close()
+            print("Database connection established successfully.")
+            break
+        except OperationalError:
+            retries -= 1
+            if retries == 0:
+                print("Could not connect to database after 60 seconds. Exiting.")
+                # The app will likely fail to start properly, but we've tried our best.
+                break
+            print(f"Database not ready yet. Retrying in 2 seconds... ({retries} attempts remaining)")
+            await asyncio.sleep(2)
+    
+    yield
+    # Shutdown logic can be added here if needed (e.g. closing Redis connections)
+
 app = FastAPI(
     title="Vesotel Gestor Jornada API",
     description="API for managing work logs and user settings.",
-    root_path="/api"
+    root_path="/api",
+    lifespan=lifespan
 )
 # app.include_router(shopify_routes.router)
 
@@ -440,15 +475,14 @@ def read_users_me(db: Session = Depends(get_db), current_user: models.User = Dep
                 db.commit()
                 db.refresh(current_user)
 
-    # Compute is_supervisor
-    # Check efficiently
-    has_manager_role = db.query(models.CompanyMember).filter(
+    # Compute flags (is_supervisor and is_active_worker)
+    memberships = db.query(models.CompanyMember).filter(
         models.CompanyMember.user_id == current_user.id,
-        models.CompanyMember.role.in_([models.CompanyRole.manager, models.CompanyRole.admin]),
         models.CompanyMember.is_active == True
-    ).first()
+    ).all()
     
-    current_user.is_supervisor = True if has_manager_role else False
+    current_user.is_supervisor = any(m.role in [models.CompanyRole.manager, models.CompanyRole.admin] for m in memberships)
+    current_user.is_active_worker = len(memberships) > 0
 
     return current_user
 
@@ -699,8 +733,8 @@ def read_companies_detailed(db: Session = Depends(get_db), current_user: models.
     for m in user_memberships:
         company = m.company # The Company relationship
         if company and company.settings:
-             features = company.settings.get("features", {})
-             if features.get("worker_daily_report") is True:
+             modules = company.settings.get("modules", {})
+             if modules.get("worker_daily_report", True) is True:
                  allowed_company_ids.add(company.id)
 
     if allowed_company_ids:

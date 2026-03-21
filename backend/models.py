@@ -1,5 +1,5 @@
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Numeric, Date, Time, Text, Enum, JSON
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Numeric, Date, Time, Text, Enum
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 import uuid
 from datetime import datetime
@@ -64,14 +64,14 @@ class Company(Base):
     fiscal_id = Column(String)
     
     # SaaS Evolution: Dynamic tax/deduction configuration
-    tax_config = Column(JSON, default={"social_security": 0.0648})
+    tax_config = Column(JSONB, default={"social_security": 0.0648})
     # Structure example: { "social_security": 0.0648, "irpf_base": 0.15 }
     
     # SaaS Evolution: Dynamic shift definitions
-    worklog_definitions = Column(JSON, default={}) 
+    worklog_definitions = Column(JSONB, default={}) 
     # Structure example: { "particular": { "unit": "hours", "label": "Particular", "fields": [...] } }
     
-    settings = Column(JSON, default={}) # Global company settings
+    settings = Column(JSONB, default={}) # Global company settings
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -88,10 +88,10 @@ class CompanyMember(Base):
     is_active = Column(Boolean, default=True) 
     
     # SaaS Evolution: The "Contract" - user rates for THIS specific company
-    rates_config = Column(JSON, default={})
+    rates_config = Column(JSONB, default={})
     # Structure example: { "particular": { "base_rate": 25.0, "is_gross": true, "tax_overrides": {...} } }
 
-    settings = Column(JSON, default={}) # User-specific UI/Feature overrides
+    settings = Column(JSONB, default={}) # User-specific UI/Feature overrides
     joined_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -121,13 +121,13 @@ class WorkLog(Base):
     gross_amount = Column(Numeric(10, 2), default=0.0)
     rate_applied = Column(Numeric(10, 2), nullable=True)
     
-    extra_data = Column(JSON, default={}) # Stores dynamic extras: {"has_night": true, etc.}
+    extra_data = Column(JSONB, default={}) # Stores dynamic extras: {"has_night": true, etc.}
     
     description = Column(Text, nullable=True)
     client = Column(String, nullable=True)
     
     # SaaS Evolution: Historical integrity snapshot
-    calculation_snapshot = Column(JSON, nullable=True)
+    calculation_snapshot = Column(JSONB, nullable=True)
     # Stores a copy of rates, definitions and logic used for this calculation.
     
     created_at = Column(DateTime, default=datetime.utcnow)

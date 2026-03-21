@@ -10,6 +10,10 @@ import models, schemas, auth
 from sqlalchemy.orm.attributes import flag_modified
 import uuid
 from datetime import date, datetime
+from typing import Any, Dict, List, Optional
+import json
+from pydantic import TypeAdapter
+from redis_config import redis_manager, logger
 
 
 
@@ -63,6 +67,7 @@ def create_user(db: Session, user: schemas.UserCreate):
         db_user.default_company_id = personal_company.id
         db.commit()
         db.refresh(db_user)
+        _invalidate_company_rates(personal_company.id)
         
     return db_user
 
@@ -262,10 +267,37 @@ def calculate_dynamic_work_log(log_data: dict, company_def: dict, user_rate: dic
 def get_company_rates(db: Session, company_id: str):
     """
     SaaS Evolution: Gets rates from the members table instead of the deprecated rates table.
+    Includes Redis caching with Failover.
     """
-    return db.query(models.CompanyMember) \
+    cache_key = f"company_rates:{company_id}"
+    
+    # 1. Try Cache
+    cached_data = redis_manager.get(cache_key)
+    if cached_data:
+        try:
+            return json.loads(cached_data)
+        except Exception as e:
+            logger.error(f"Failed to decode rates cache for {company_id}: {e}")
+
+    # 2. Db Fetch
+    members = db.query(models.CompanyMember) \
              .options(joinedload(models.CompanyMember.user)) \
              .filter(models.CompanyMember.company_id == company_id).all()
+    
+    # 3. Serialize and Store
+    try:
+        # We use CompanyMemberResponse schema for consistent serialization (handles UUIDs/Dates)
+        adapter = TypeAdapter(List[schemas.CompanyMemberResponse])
+        serialized = adapter.dump_python(members, mode='json')
+        redis_manager.set(cache_key, json.dumps(serialized), ex=3600)
+    except Exception as e:
+        logger.error(f"Failed to cache rates for {company_id}: {e}")
+
+    return members
+
+def _invalidate_company_rates(company_id: Any):
+    """Helper to invalidate rates cache."""
+    redis_manager.delete(f"company_rates:{company_id}")
 
 
 def create_work_log(db: Session, work_log: schemas.WorkLogCreate):
@@ -462,7 +494,11 @@ def _update_single_work_log(db: Session, db_work_log: models.WorkLog, work_log: 
 
 # --- Company Membership Logic ---
 
-    # SaaS Evolution: No more default rates table
+def join_company(db: Session, user_id: str, company_id: str):
+    """
+    Adds a user to a company or returns existing membership.
+    """
+    member = get_company_member(db, user_id, company_id)
     if not member:
          new_member = models.CompanyMember(
             user_id=user_id,
@@ -474,11 +510,12 @@ def _update_single_work_log(db: Session, db_work_log: models.WorkLog, work_log: 
          db.add(new_member)
          db.commit()
          db.refresh(new_member)
+         _invalidate_company_rates(company_id)
          return new_member
     
     return member
 
-    # Left join Company with CompanyMember for this user
+def get_joinable_companies(db: Session, user_id: str):
     results = db.query(models.Company, models.CompanyMember.is_active)\
         .outerjoin(models.CompanyMember, and_(
             models.CompanyMember.company_id == models.Company.id,
@@ -549,24 +586,40 @@ def update_company_member_status(db: Session, company_id: str, user_id: str, is_
         member.is_active = is_active
         db.commit()
         db.refresh(member)
+        _invalidate_company_rates(company_id)
     return member
 
-def update_company_member(db: Session, company_id: str, user_id: str, member_update: schemas.CompanyMemberUpdate):
+def update_company_member(db: Session, company_id: Any, user_id: Any, member_update: schemas.CompanyMemberUpdate):
+    # Ensure UUIDs
+    from uuid import UUID
+    try:
+        cid = UUID(str(company_id)) if not isinstance(company_id, UUID) else company_id
+        uid = UUID(str(user_id)) if not isinstance(user_id, UUID) else user_id
+    except ValueError:
+        return None
+
     member = db.query(models.CompanyMember).filter(
-        models.CompanyMember.company_id == company_id,
-        models.CompanyMember.user_id == user_id
+        models.CompanyMember.company_id == cid,
+        models.CompanyMember.user_id == uid
     ).first()
     
     if member:
-        update_data = member_update.dict(exclude_unset=True)
+        # Use model_dump(exclude_unset=True)
+        update_data = member_update.model_dump(exclude_unset=True, by_alias=False)
         
-        # Check for status change to inactive
         for key, value in update_data.items():
-            setattr(member, key, value)
+            if key == "role" and value:
+                try:
+                    setattr(member, key, models.CompanyRole(value))
+                except ValueError:
+                    print(f"WARNING: Invalid company role value: {value}")
+            else:
+                setattr(member, key, value)
             if key in ["settings", "rates_config"]:
                  flag_modified(member, key)
         db.commit()
         db.refresh(member)
+        _invalidate_company_rates(company_id)
     return member
 
 
@@ -607,12 +660,26 @@ def update_company(db: Session, company_id: str, company: schemas.CompanyUpdate)
         db.refresh(db_company)
     return db_company
 
-def update_user(db: Session, user_id: str, user: schemas.UserUpdate):
-    db_user = db.query(models.User).filter(models.User.id == user_id).first()
+def update_user(db: Session, user_id: Any, user: schemas.UserUpdate):
+    from uuid import UUID
+    try:
+        uid = UUID(str(user_id)) if not isinstance(user_id, UUID) else user_id
+    except ValueError:
+        return None
+        
+    db_user = db.query(models.User).filter(models.User.id == uid).first()
     if db_user:
-        update_data = user.dict(exclude_unset=True)
+        # Use model_dump(exclude_unset=True) to get only provided fields
+        update_data = user.model_dump(exclude_unset=True)
         for key, value in update_data.items():
-            setattr(db_user, key, value)
+            if key == "role" and value:
+                # Convert string role to UserRole enum
+                try:
+                    setattr(db_user, key, models.UserRole(value))
+                except ValueError:
+                    print(f"WARNING: Invalid role value: {value}")
+            else:
+                setattr(db_user, key, value)
         db.commit()
         db.refresh(db_user)
     return db_user

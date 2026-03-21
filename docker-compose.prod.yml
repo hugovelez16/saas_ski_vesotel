@@ -20,8 +20,18 @@ services:
       - "8000:8000"
     depends_on:
       - postgres
+      - redis
     networks:
       - app
+      - db
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
       - db
     restart: unless-stopped
 
@@ -57,6 +67,7 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:
 
 networks:
   app:

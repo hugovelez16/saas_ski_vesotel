@@ -131,10 +131,10 @@ describe('Users API Client', () => {
 
     describe('Admin Functions', () => {
         it('impersonateUser should POST /admin/impersonate/:id', async () => {
-            (mockedApi.post as any).mockResolvedValue({ data: { accessToken: 'tok' } });
+            (mockedApi.post as any).mockResolvedValue({ data: { access_token: 'tok' } });
             const result = await impersonateUser('u-1');
             expect(mockedApi.post).toHaveBeenCalledWith('/admin/impersonate/u-1');
-            expect(result.accessToken).toBe('tok');
+            expect(result.access_token).toBe('tok');
         });
 
         it('updateUserRatesAdmin should PUT /users/:id/rates', async () => {

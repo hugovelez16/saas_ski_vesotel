@@ -50,12 +50,28 @@ interface UserRatesEditDialogProps {
     company: Company;
     rate?: UserCompanyRate;
     userName: string;
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
 }
 
-export function UserRatesEditDialog({ userId, company, rate, userName }: UserRatesEditDialogProps) {
-    const [open, setOpen] = useState(false);
+export function UserRatesEditDialog({ userId, company, rate, userName, open: externalOpen, onOpenChange }: UserRatesEditDialogProps) {
+    const [internalOpen, setInternalOpen] = useState(false);
+    const open = externalOpen !== undefined ? externalOpen : internalOpen;
+    const setOpen = onOpenChange || setInternalOpen;
+
     const { toast } = useToast();
     const queryClient = useQueryClient();
+
+    // Determine which fields to show based on company config
+    const worklogDefs = company.worklogDefinitions || {};
+    const hasDaily = Object.values(worklogDefs).some((d: any) => d.is_range === true);
+    const hasNight = Object.values(worklogDefs).some((d: any) => (d.options || []).some((o: string) => o.toLowerCase().includes('nocturna') || o.toLowerCase().includes('noche')));
+    const hasCoordination = Object.values(worklogDefs).some((d: any) => (d.options || []).some((o: string) => o.toLowerCase().includes('coordinación') || o.toLowerCase().includes('coordinacion')));
+    
+    // Taxes present in company config
+    const taxKeys = Object.keys(company.taxConfig || {});
+    const hasSs = taxKeys.some(k => k.toLowerCase().includes('social_security') || k.toLowerCase().includes('ss'));
+    const hasIrpf = taxKeys.some(k => k.toLowerCase().includes('irpf'));
 
     const form = useForm<RateFormValues>({
         resolver: zodResolver(rateFormSchema),
@@ -80,9 +96,9 @@ export function UserRatesEditDialog({ userId, company, rate, userName }: UserRat
                 nightRate: rate?.nightRate || 0,
                 coordinationRate: rate?.coordinationRate || 0,
                 isGross: rate?.isGross !== undefined ? rate?.isGross : true,
-                deductionSs: rate?.deductionSs !== undefined && rate?.deductionSs !== null ? rate.deductionSs : null,
-                deductionIrpf: rate?.deductionIrpf || 0,
-                deductionExtra: rate?.deductionExtra || 0,
+                deductionSs: rate?.deductionSs !== undefined && rate?.deductionSs !== null ? parseFloat((rate.deductionSs * 100).toFixed(2)) : null,
+                deductionIrpf: rate?.deductionIrpf ? parseFloat((rate.deductionIrpf * 100).toFixed(2)) : 0,
+                deductionExtra: rate?.deductionExtra ? parseFloat((rate.deductionExtra * 100).toFixed(2)) : 0,
             });
         }
     }, [rate, open, form]);
@@ -90,14 +106,14 @@ export function UserRatesEditDialog({ userId, company, rate, userName }: UserRat
     const mutation = useMutation({
         mutationFn: (values: any) => updateUserRatesAdmin(userId, values),
         onSuccess: () => {
-            toast({ title: "Rates updated successfully" });
-            queryClient.invalidateQueries({ queryKey: ["user-rates", userId] });
+            toast({ title: "Tarifas actualizadas correctamente" });
+            queryClient.invalidateQueries({ queryKey: ["companyRates", company.id] });
             setOpen(false);
         },
         onError: (error: any) => {
             toast({
-                title: "Failed to update rates",
-                description: error.response?.data?.detail || "An error occurred",
+                title: "Error al actualizar tarifas",
+                description: error.response?.data?.detail || "Ha ocurrido un error",
                 variant: "destructive",
             });
         },
@@ -111,25 +127,27 @@ export function UserRatesEditDialog({ userId, company, rate, userName }: UserRat
             night_rate: data.nightRate,
             coordination_rate: data.coordinationRate,
             is_gross: data.isGross,
-            deduction_ss: data.deductionSs === null ? null : data.deductionSs,
-            deduction_irpf: data.deductionIrpf,
-            deduction_extra: data.deductionExtra,
+            deduction_ss: data.deductionSs === null ? null : data.deductionSs / 100,
+            deduction_irpf: data.deductionIrpf / 100,
+            deduction_extra: data.deductionExtra / 100,
         };
         mutation.mutate(payload);
     }
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <Pencil className="h-4 w-4" />
-                </Button>
-            </DialogTrigger>
+            {!onOpenChange && (
+                <DialogTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <Pencil className="h-4 w-4" />
+                    </Button>
+                </DialogTrigger>
+            )}
             <DialogContent className="max-w-2xl">
                 <DialogHeader>
-                    <DialogTitle>Edit Rates: {userName}</DialogTitle>
+                    <DialogTitle>Editar Tarifas: {userName}</DialogTitle>
                     <DialogDescription>
-                        Configure specific billing rates and tax deductions for {userName} at {company.name}.
+                        Configura las tarifas de facturación específicas y deducciones de impuestos para {userName} en {company.name}.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -141,7 +159,7 @@ export function UserRatesEditDialog({ userId, company, rate, userName }: UserRat
                                 name="hourlyRate"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Hourly Rate (€/h)</FormLabel>
+                                        <FormLabel>Tarifa por Hora (€/h)</FormLabel>
                                         <FormControl>
                                             <Input type="number" step="0.01" {...field} />
                                         </FormControl>
@@ -149,59 +167,65 @@ export function UserRatesEditDialog({ userId, company, rate, userName }: UserRat
                                     </FormItem>
                                 )}
                             />
-                            <FormField
-                                control={form.control}
-                                name="dailyRate"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Daily Rate (€/day)</FormLabel>
-                                        <FormControl>
-                                            <Input type="number" step="0.01" {...field} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={form.control}
-                                name="nightRate"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Night Rate (€/night)</FormLabel>
-                                        <FormControl>
-                                            <Input type="number" step="0.01" {...field} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={form.control}
-                                name="coordinationRate"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Coordination Rate (€)</FormLabel>
-                                        <FormControl>
-                                            <Input type="number" step="0.01" {...field} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
+                            {hasDaily && (
+                                <FormField
+                                    control={form.control}
+                                    name="dailyRate"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Tarifa por Día (€/día)</FormLabel>
+                                            <FormControl>
+                                                <Input type="number" step="0.01" {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            )}
+                            {hasNight && (
+                                <FormField
+                                    control={form.control}
+                                    name="nightRate"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Plus Nocturnidad (€/noche)</FormLabel>
+                                            <FormControl>
+                                                <Input type="number" step="0.01" {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            )}
+                            {hasCoordination && (
+                                <FormField
+                                    control={form.control}
+                                    name="coordinationRate"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Plus Coordinación (€)</FormLabel>
+                                            <FormControl>
+                                                <Input type="number" step="0.01" {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            )}
                         </div>
 
                         <div className="space-y-4 border-t pt-4">
                             <div className="flex items-center justify-between">
                                 <div className="space-y-0.5">
-                                    <h3 className="text-base font-semibold">Tax Settings</h3>
-                                    <p className="text-sm text-muted-foreground">Configure deductions for these rates.</p>
+                                    <h3 className="text-base font-semibold">Impuestos y Deducciones</h3>
+                                    <p className="text-sm text-muted-foreground">Configura las retenciones para estas tarifas.</p>
                                 </div>
                                 <FormField
                                     control={form.control}
                                     name="isGross"
                                     render={({ field }) => (
                                         <FormItem className="flex flex-row items-center gap-2 space-y-0">
-                                            <FormLabel className="text-base cursor-pointer">Prices are Gross</FormLabel>
+                                            <FormLabel className="text-base cursor-pointer">Precios sobre Bruto</FormLabel>
                                             <FormControl>
                                                 <Switch
                                                     checked={field.value}
@@ -215,48 +239,52 @@ export function UserRatesEditDialog({ userId, company, rate, userName }: UserRat
 
                             {form.watch("isGross") && (
                                 <div className="grid gap-4 md:grid-cols-3">
-                                    <FormField
-                                        control={form.control}
-                                        name="deductionSs"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Social Security (SS) (%)</FormLabel>
-                                                <FormControl>
-                                                    <Input
-                                                        type="number"
-                                                        step="0.01"
-                                                        placeholder={(company as any).social_security_deduction ? `Default: ${((company as any).social_security_deduction * 100).toFixed(2)}` : "0"}
-                                                        {...field}
-                                                        value={field.value === null ? "" : field.value}
-                                                        onChange={e => field.onChange(e.target.value === "" ? null : Number(e.target.value))}
-                                                    />
-                                                </FormControl>
-                                                <FormDescription>
-                                                    Empty for Default ({(company as any).social_security_deduction ? ((company as any).social_security_deduction * 100).toFixed(2) : 0}%)
-                                                </FormDescription>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                    <FormField
-                                        control={form.control}
-                                        name="deductionIrpf"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>IRPF (%)</FormLabel>
-                                                <FormControl>
-                                                    <Input type="number" step="0.01" {...field} />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
+                                    {hasSs && (
+                                        <FormField
+                                            control={form.control}
+                                            name="deductionSs"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Seguridad Social (SS) (%)</FormLabel>
+                                                    <FormControl>
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            placeholder={company.taxConfig?.social_security ? `Por defecto: ${company.taxConfig.social_security * 100}%` : "0"}
+                                                            {...field}
+                                                            value={field.value === null ? "" : field.value}
+                                                            onChange={e => field.onChange(e.target.value === "" ? null : Number(e.target.value))}
+                                                        />
+                                                    </FormControl>
+                                                    <FormDescription>
+                                                        Vacío para usar defecto ({company.taxConfig?.social_security ? company.taxConfig.social_security * 100 : 0}%)
+                                                    </FormDescription>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                    )}
+                                    {hasIrpf && (
+                                        <FormField
+                                            control={form.control}
+                                            name="deductionIrpf"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>IRPF (%)</FormLabel>
+                                                    <FormControl>
+                                                        <Input type="number" step="0.01" {...field} />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                    )}
                                     <FormField
                                         control={form.control}
                                         name="deductionExtra"
                                         render={({ field }) => (
                                             <FormItem>
-                                                <FormLabel>Extra (%)</FormLabel>
+                                                <FormLabel>Deducción Extra (%)</FormLabel>
                                                 <FormControl>
                                                     <Input type="number" step="0.01" {...field} />
                                                 </FormControl>
@@ -270,11 +298,11 @@ export function UserRatesEditDialog({ userId, company, rate, userName }: UserRat
 
                         <DialogFooter>
                             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-                                Cancel
+                                Cancelar
                             </Button>
                             <Button type="submit" disabled={mutation.isPending}>
                                 {mutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Save Changes
+                                Guardar Cambios
                             </Button>
                         </DialogFooter>
                     </form>

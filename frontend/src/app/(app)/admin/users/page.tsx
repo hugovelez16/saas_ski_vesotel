@@ -36,7 +36,7 @@ export default function AdminUsersPage() {
     const impersonateMutation = useMutation({
         mutationFn: impersonateUser,
         onSuccess: (data) => {
-            setAuthToken(data.accessToken);
+            setAuthToken(data.access_token);
             window.location.href = "/dashboard";
             toast({ title: "Simulación iniciada", description: "Ahora actúas como el usuario seleccionado." });
         },

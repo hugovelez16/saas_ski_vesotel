@@ -11,9 +11,10 @@ interface JsonEditorProps {
     onSave: (value: any) => void
     label?: string
     description?: string
+    rows?: number
 }
 
-export function JsonEditor({ initialValue, onSave, label, description }: JsonEditorProps) {
+export function JsonEditor({ initialValue, onSave, label, description, rows = 12 }: JsonEditorProps) {
     const [value, setValue] = React.useState(JSON.stringify(initialValue, null, 2))
     const [error, setError] = React.useState<string | null>(null)
     const [isValid, setIsValid] = React.useState(true)
@@ -58,8 +59,8 @@ export function JsonEditor({ initialValue, onSave, label, description }: JsonEdi
                 <Textarea
                     value={value}
                     onChange={handleChange}
-                    rows={12}
-                    className={`font-mono text-xs bg-slate-950 text-slate-50 border-2 focus-visible:ring-0 ${isValid ? "border-slate-800" : "border-red-500"
+                    rows={rows}
+                    className={`text-sm bg-slate-950 text-slate-50 border-2 focus-visible:ring-0 ${isValid ? "border-slate-800" : "border-red-500"
                         }`}
                 />
                 <div className="absolute bottom-2 right-2 flex items-center gap-2">
