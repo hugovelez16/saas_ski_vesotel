@@ -127,7 +127,7 @@ export function UserRatesEditDialog({ userId, company, rate, userName, open: ext
             night_rate: data.nightRate,
             coordination_rate: data.coordinationRate,
             is_gross: data.isGross,
-            deduction_ss: data.deductionSs === null ? null : data.deductionSs / 100,
+            deduction_ss: data.deductionSs == null ? null : data.deductionSs / 100,
             deduction_irpf: data.deductionIrpf / 100,
             deduction_extra: data.deductionExtra / 100,
         };
