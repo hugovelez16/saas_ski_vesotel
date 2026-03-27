@@ -7,6 +7,8 @@ export interface CreateUserRequest {
     first_name: string;
     last_name: string;
     role?: string;
+    companyId?: string | null;
+    sendEmail?: boolean;
 }
 
 export const getUsers = async (): Promise<User[]> => {

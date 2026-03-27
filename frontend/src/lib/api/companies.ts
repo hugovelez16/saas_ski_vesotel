@@ -15,6 +15,11 @@ export const updateCompany = async (companyId: string, data: any): Promise<Compa
     return response.data;
 };
 
+export const getCompanies = async (): Promise<CompanyResponse[]> => {
+    const response = await api.get<CompanyResponse[]>("/companies");
+    return response.data;
+};
+
 export const getCompaniesDetailed = async (): Promise<CompanyWithMembers[]> => {
     const response = await api.get<CompanyWithMembers[]>("/companies/detailed");
     return response.data;
@@ -35,7 +40,7 @@ export const getMyCompanies = async (): Promise<CompanyResponse[]> => {
     return response.data;
 };
 
-// Admin & Supervisor actions
+// Admin & Manager actions
 export const updateMemberStatus = async (companyId: string, userId: string, status: string): Promise<CompanyMemberResponse> => {
     const response = await api.put<CompanyMemberResponse>(`/companies/${companyId}/members/${userId}/status?status=${status}`);
     return response.data;

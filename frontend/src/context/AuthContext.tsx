@@ -12,6 +12,8 @@ interface AuthContextType {
     verify2FA: (code: string, trustDevice?: boolean) => Promise<void>;
     resend2FA: () => Promise<void>;
     logout: () => void;
+    stopImpersonation: () => Promise<void>;
+    switchScope: (companyId: string, role: string) => Promise<void>;
     checkAuth: () => Promise<void>;
 }
 
@@ -22,6 +24,8 @@ const AuthContext = createContext<AuthContextType>({
     verify2FA: async () => { },
     resend2FA: async () => { },
     logout: () => { },
+    stopImpersonation: async () => { },
+    switchScope: async () => { },
     checkAuth: async () => { },
 });
 
@@ -51,26 +55,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     const checkAuth = async () => {
-        let token = typeof window !== 'undefined' ? (sessionStorage.getItem('token') || localStorage.getItem('token')) : null;
-
-        // Check URL for token (Impersonation / Magic Link)
-        if (typeof window !== 'undefined') {
-            const params = new URLSearchParams(window.location.search);
-            const urlToken = params.get('token');
-            if (urlToken) {
-                token = urlToken;
-                sessionStorage.setItem('token', token); // Use session storage for impersonation/temp link
-                // Clear URL
-                window.history.replaceState({}, document.title, window.location.pathname);
-            }
-        }
-
-        if (token) {
-            setAuthToken(token);
-            await fetchUser();
-        } else {
-            setLoading(false);
-        }
+        // In Cookie mode, we just try to fetch the user. 
+        // If the browser has the HttpOnly cookie, this will succeed.
+        await fetchUser();
     };
 
     useEffect(() => {
@@ -98,7 +85,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const tokenData = response.data;
 
         if (tokenData.requires_2fa) {
-            setAuthToken(tokenData.access_token); // Temp token
+            // Provisional token is also in a cookie now
             return { requires2FA: true };
         }
 
@@ -113,8 +100,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
         if (userData?.role === 'admin') {
             router.push('/admin/companies');
-        } else if (userData?.is_supervisor) {
-            router.push('/supervisor/daily-reports');
+        } else if (userData?.is_manager) {
+            router.push('/manager/daily-reports');
         } else {
             router.push('/dashboard');
         }
@@ -125,18 +112,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const response = await api.post('/verify-2fa', { code, trustDevice });
         // Backend returns snake_case
         const tokenData = response.data;
+        // setAuthToken handles the 'cookie' signal
         setAuthToken(tokenData.access_token);
-
-        if (tokenData.device_token) {
-            localStorage.setItem('device_token', tokenData.device_token);
-        }
 
         const userData = await fetchUser();
 
         if (userData?.role === 'admin') {
             router.push('/admin/companies');
-        } else if (userData?.is_supervisor) {
-            router.push('/supervisor/daily-reports');
+        } else if (userData?.is_manager) {
+            router.push('/manager/daily-reports');
         } else {
             router.push('/dashboard');
         }
@@ -146,16 +130,51 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         await api.post('/resend-2fa');
     };
 
-    const logout = () => {
-        setAuthToken(null);
-        setUser(null);
-        localStorage.removeItem('token');
-        sessionStorage.removeItem('token');
-        router.push('/login');
+    const logout = async () => {
+        try {
+            await api.post('/logout');
+        } catch (error) {
+            console.error("Logout failed on server:", error);
+        } finally {
+            setAuthToken(null);
+            setUser(null);
+            localStorage.removeItem('token');
+            sessionStorage.removeItem('token');
+            router.push('/login');
+        }
+    };
+
+    const stopImpersonation = async () => {
+        try {
+            await api.post('/admin/stop-impersonation');
+            // After restoring cookies on server, we need to refresh local user state
+            await fetchUser();
+            router.push('/admin/users'); // Go back to users management
+        } catch (error) {
+            console.error("Failed to stop impersonation:", error);
+            logout(); // Fallback to logout on error
+        }
+    };
+
+    const switchScope = async (companyId: string, role: string) => {
+        try {
+            await api.post('/auth/switch-scope', { company_id: companyId, company_role: role });
+            await fetchUser();
+            // Force a full page reload to clear all caches and ensure everything (Sidebar, etc) reflects the new context
+            if (!companyId) {
+                window.location.href = '/admin/companies';
+            } else if (role === 'manager') {
+                window.location.href = `/manager/dashboard?companyId=${companyId}`;
+            } else {
+                window.location.href = `/dashboard?companyId=${companyId}`;
+            }
+        } catch (error) {
+            console.error("Failed to switch scope:", error);
+        }
     };
 
     return (
-        <AuthContext.Provider value={{ user, loading, login, verify2FA, resend2FA, logout, checkAuth }}>
+        <AuthContext.Provider value={{ user, loading, login, verify2FA, resend2FA, logout, stopImpersonation, switchScope, checkAuth }}>
             {children}
         </AuthContext.Provider>
     );

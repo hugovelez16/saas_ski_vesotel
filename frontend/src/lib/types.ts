@@ -9,9 +9,13 @@ export interface UserProfile {
     role: string;
     is_active: boolean;
     is_active_worker?: boolean;
-    is_supervisor?: boolean;
+    is_manager?: boolean;
     must_change_password?: boolean;
     is_2fa_enabled?: boolean;
+    is_impersonated?: boolean;
+    is_platform_admin?: boolean;
+    active_company_id?: string | null;
+    active_role?: string | null;
     default_company_id?: string | null;
     created_at: string;
 }

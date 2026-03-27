@@ -12,37 +12,25 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
  */
 const api = axios.create({
   baseURL: API_URL,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
 /**
- * Sets the authentication token for all future API requests.
- * Also persists the token in localStorage for session persistence.
+ * Sets the authentication token for all future API requests (Fallback/Compatibility).
+ * In Cookie mode, this is mostly ignored as cookies are handled by the browser.
  * 
  * @param token - The JWT access token or null to clear it.
  */
 export const setAuthToken = (token: string | null) => {
-  if (token) {
+  if (token && token !== 'cookie') {
     api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('token', token);
-    }
   } else {
     delete api.defaults.headers.common['Authorization'];
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('token');
-    }
   }
 };
 
-// Initialize token from storage if available
-if (typeof window !== 'undefined') {
-  const token = localStorage.getItem('token');
-  if (token) {
-    setAuthToken(token);
-  }
-}
-
+// Initialization from storage removed - now relying on HttpOnly cookies
 export default api;
