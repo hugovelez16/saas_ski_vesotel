@@ -21,7 +21,7 @@ import { User, WorkLog } from "@/lib/types";
 import { OverviewV3 } from "@/components/dashboard/overview-v2";
 import { AnalyticsV2 as AnalyticsV3 } from "@/components/dashboard/analytics-v2";
 
-export default function SupervisorUserDetailsPage({ params }: { params: Promise<{ userId: string }> }) {
+export default function ManagerUserDetailsPage({ params }: { params: Promise<{ userId: string }> }) {
     const { userId } = use(params);
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -80,7 +80,7 @@ export default function SupervisorUserDetailsPage({ params }: { params: Promise<
         enabled: !!user
     });
 
-    // Fetch Logged-in Supervisor's companies for visibility restriction
+    // Fetch Logged-in Manager's companies for visibility restriction
     const { data: myCompanies = [], isSuccess: isMyCompaniesSuccess } = useQuery({
         queryFn: getMyCompanies,
         queryKey: ["myCompanies"],
@@ -89,22 +89,22 @@ export default function SupervisorUserDetailsPage({ params }: { params: Promise<
     // Auto-select first company if none selected
     useEffect(() => {
         if (!companyIdParam && isMyCompaniesSuccess && myCompanies.length > 0 && companies.length > 0) {
-            // Find first company that is both in user's companies and supervisor's managed companies
+            // Find first company that is both in user's companies and manager's managed companies
             const firstManagedCompany = companies.find((c: any) => myCompanies.some((mc: any) => mc.id === c.id));
             if (firstManagedCompany) {
-                router.replace(`/supervisor/users/${userId}?companyId=${firstManagedCompany.id}`);
+                router.replace(`/manager/users/${userId}?companyId=${firstManagedCompany.id}`);
             }
         }
     }, [companyIdParam, isMyCompaniesSuccess, myCompanies, companies, router, userId]);
 
-    // Filtering Logic: Only show companies (and associated data) that the supervisor manages
-    // Filtering Logic: Only show companies (and associated data) that the supervisor manages
+    // Filtering Logic: Only show companies (and associated data) that the manager manages
+    // Filtering Logic: Only show companies (and associated data) that the manager manages
     const visibleCompanies = useMemo(() => {
         // Strict filtering: If myCompanies is empty, show nothing.
-        // This prevents "Global Admin" leakage in the Supervisor view.
+        // This prevents "Global Admin" leakage in the Manager view.
         if (myCompanies.length === 0) return [];
 
-        // 1. Filter by Supervisor's managed companies
+        // 1. Filter by Manager's managed companies
         let filtered = companies.filter((c: any) => myCompanies.some((mc: any) => mc.id === c.id));
 
         // 2. Strict filtering: If a specific company is selected in the URL, ONLY show that company.
@@ -344,7 +344,7 @@ export default function SupervisorUserDetailsPage({ params }: { params: Promise<
                         </div>
                         <div className="flex gap-2 mt-1">
                             {user.is_active_worker && <Badge variant="secondary" className="text-xs border-green-200 bg-green-50 text-green-700">Worker</Badge>}
-                            {user.is_supervisor && <Badge variant="secondary" className="text-xs border-blue-200 bg-blue-50 text-blue-700">Supervisor</Badge>}
+                            {user.is_manager && <Badge variant="secondary" className="text-xs border-blue-200 bg-blue-50 text-blue-700">Manager</Badge>}
                             <span className="text-xs text-muted-foreground flex items-center ml-2">
                                 <Calendar className="w-3 h-3 mr-1" /> Moved/Created: {user.created_at ? format(new Date(user.created_at), 'MMM d, yyyy') : 'N/A'}
                             </span>

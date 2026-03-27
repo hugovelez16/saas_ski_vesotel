@@ -15,7 +15,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { WorkLogDetailsDialog } from "@/components/work-log/details-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { SupervisorAddWorkLogDialog } from "@/components/work-log/supervisor-add-log-dialog";
+import { ManagerAddWorkLogDialog } from "@/components/work-log/manager-add-log-dialog";
 import { useQueryClient } from "@tanstack/react-query";
 
 export default function DailyReportPage() {
@@ -264,22 +264,22 @@ export default function DailyReportPage() {
             />
 
             {/* Create Dialog */}
-            <SupervisorAddWorkLogDialog
+            <ManagerAddWorkLogDialog
                 open={createLogState.open}
                 onOpenChange={(open) => setCreateLogState(prev => ({ ...prev, open }))}
                 initialData={createLogState.data}
                 companyId={createLogState.data?.companyId || ""}
-                companyName={companies.find((c: any) => c.id === createLogState.data?.companyId)?.name || "Company"}
+                companyName={companies.find(c => c.id === createLogState.data?.companyId)?.name || "Company"}
                 users={
                     companies.find((c: any) => c.id === createLogState.data?.companyId)?.members.map((m: any) => m.user) || []
                 }
-                onLogUpdate={() => {
+                onSuccess={() => {
                     queryClient.invalidateQueries({ queryKey: ["work-logs-daily-admin"] });
                     setCreateLogState({ open: false });
                 }}
             >
                 <span className="hidden" />
-            </SupervisorAddWorkLogDialog>
+            </ManagerAddWorkLogDialog>
         </div>
     );
 }

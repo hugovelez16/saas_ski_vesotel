@@ -17,12 +17,15 @@ import {
     Menu,
     X,
     PanelLeftClose,
-    PanelLeftOpen
+    PanelLeftOpen,
+    Ghost,
+    Building2
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { getMyCompanies } from "@/lib/api/companies";
+import { ScopeSelectionDialog } from "@/components/auth/scope-selection-dialog";
 
 
 // Sidebar Context for global state if needed
@@ -52,13 +55,14 @@ export type NavGroup = {
     items: NavItem[];
 };
 
-export function Sidebar({ navGroups, companySwitcher }: { navGroups: NavGroup[]; companySwitcher?: React.ReactNode }) {
+export function Sidebar({ navGroups }: { navGroups: NavGroup[] }) {
     const { expanded, setExpanded } = useContext(SidebarContext);
-    const { user, logout } = useAuth();
+    const { user, logout, stopImpersonation } = useAuth();
     const pathname = usePathname();
     const searchParams = useSearchParams();
     const [isMobile, setIsMobile] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
+    const [isScopeDialogOpen, setIsScopeDialogOpen] = useState(false);
 
     // State to track expanded groups. key = group index
     // Default open all
@@ -197,6 +201,29 @@ export function Sidebar({ navGroups, companySwitcher }: { navGroups: NavGroup[];
                                     </div>
                                 </Link>
 
+                                {user?.is_impersonated && (
+                                    <button 
+                                        onClick={stopImpersonation} 
+                                        className="flex items-center space-x-3 text-amber-500 w-full px-3 py-2 hover:bg-amber-500/10 rounded-md transition-colors mb-2 bg-amber-500/5"
+                                    >
+                                        <Ghost size={20} />
+                                        <span>Finalizar Simulación</span>
+                                    </button>
+                                )}
+
+                                <button 
+                                    onClick={() => { setIsScopeDialogOpen(true); setMobileOpen(false); }}
+                                    className="flex items-center space-x-3 text-indigo-400 w-full px-3 py-2 hover:bg-white/5 rounded-md transition-colors mb-2"
+                                >
+                                    <Building2 size={20} />
+                                    <div className="flex flex-col items-start translate-y-[1px]">
+                                        <span className="text-sm font-medium">Cambiar Contexto</span>
+                                        <span className="text-[10px] opacity-70 uppercase tracking-tighter">
+                                            {!user?.active_role ? 'Administrador' : (user.active_role === 'manager' ? 'Manager' : 'Trabajador')}
+                                        </span>
+                                    </div>
+                                </button>
+
                                 <button onClick={logout} className="flex items-center space-x-3 text-red-400 w-full px-3 py-2 hover:bg-slate-800/50 rounded-md transition-colors">
                                     <LogOut size={20} />
                                     <span>Log Out (Salir)</span>
@@ -242,16 +269,7 @@ export function Sidebar({ navGroups, companySwitcher }: { navGroups: NavGroup[];
                     </button>
                 )}
 
-                {/* Company Switcher Area */}
-                {companySwitcher && (
-                    <div className={cn("p-2", !expanded && "p-0 py-2 flex justify-center")}>
-                        {expanded ? companySwitcher : (
-                            <div className="w-8 h-8 rounded bg-slate-800 flex items-center justify-center text-slate-400">
-                                <LayoutDashboard size={16} />
-                            </div>
-                        )}
-                    </div>
-                )}
+                {/* Company Switcher Area (Removed) */}
 
                 <nav className="flex-1 p-4 overflow-x-hidden overflow-y-auto custom-scrollbar">
                     {navGroups.map((group, i) => (
@@ -292,6 +310,40 @@ export function Sidebar({ navGroups, companySwitcher }: { navGroups: NavGroup[];
                 </nav>
 
                 <div className="p-4 mt-auto border-t border-slate-800 overflow-hidden whitespace-nowrap">
+                    {/* Switch Scope Button */}
+                    <button
+                        onClick={() => setIsScopeDialogOpen(true)}
+                        className={cn(
+                            "flex items-center space-x-3 px-3 py-2 text-indigo-400 hover:text-indigo-300 w-full transition-colors mb-2 hover:bg-white/5 rounded-md group",
+                            !expanded && "justify-center px-0 mx-auto w-[40px]"
+                        )}
+                        title="Cambiar Contexto"
+                    >
+                        <Building2 size={20} className="flex-shrink-0" />
+                        {expanded && (
+                            <div className="flex flex-col items-start min-w-0">
+                                <span className="text-sm font-medium">Cambiar Contexto</span>
+                                <span className="text-[10px] opacity-50 uppercase font-bold tracking-tighter">
+                                    {!user?.active_role ? 'Administrador' : (user.active_role === 'manager' ? 'Manager' : 'Trabajador')}
+                                </span>
+                            </div>
+                        )}
+                    </button>
+
+                    {user?.is_impersonated && (
+                        <button
+                            onClick={stopImpersonation}
+                            className={cn(
+                                "flex items-center space-x-3 px-3 py-2 text-amber-500 hover:text-amber-600 w-full transition-colors whitespace-nowrap mb-2 bg-amber-500/10 rounded-md",
+                                !expanded && "justify-center px-0 mx-auto w-[40px]"
+                            )}
+                            title="Finalizar Simulación"
+                        >
+                            <Ghost size={20} className="flex-shrink-0" />
+                            {expanded && <span>Finalizar Simulación</span>}
+                        </button>
+                    )}
+
                     <Link href="/profile" className="flex items-center space-x-3 mb-4 px-3 hover:bg-slate-800 rounded-md py-2 transition-colors cursor-pointer block">
                         {!expanded ? (
                             <div className="w-8 h-8 rounded-full bg-slate-700 mx-auto flex items-center justify-center font-bold">
@@ -322,6 +374,8 @@ export function Sidebar({ navGroups, companySwitcher }: { navGroups: NavGroup[];
                         {expanded && <span>Log Out (Salir)</span>}
                     </button>
                 </div>
+
+                <ScopeSelectionDialog open={isScopeDialogOpen} onOpenChange={setIsScopeDialogOpen} />
             </motion.aside>
         </>
     );

@@ -9,7 +9,6 @@ import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
 import { LayoutDashboard, FileText, Calendar, Settings, Users, Building2, Bell, Banknote } from "lucide-react";
 import { Sidebar, SidebarProvider } from "@/components/ui/sidebar";
-import { CompanySwitcher } from "@/components/company-switcher";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Suspense } from "react";
@@ -32,121 +31,144 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         { href: "/calendar", label: "Calendar", icon: Calendar },
     ];
 
-    const commonNavItems = [
-        { href: "/reports", label: "Informes", icon: FileText },
-    ];
+    // (commonNavItems removed as we move Informes to specific sections)
 
-    // Company Selection Guard
-    const [isCompanyDialogOpen, setIsCompanyDialogOpen] = useState(false);
+    // Company Selection Guard (Legacy removed as we now use context switching)
 
-    // Fetch My Companies (Used for both Supervisor and Worker special access)
+    // Fetch My Companies (Used for both Manager and Worker special access)
     const { data: myCompanies = [] } = useQuery({
         queryFn: getMyCompanies,
         queryKey: ['myCompanies'],
         enabled: !!user
     });
 
+    // ... (managedCompanies removed as legacy switcher is gone)
+
+    // Determine target company ID for links (persist current -> session context -> default to first)
+    const targetCompanyId = currentCompanyId || user?.active_company_id || (myCompanies.length > 0 ? myCompanies[0].id : null);
+    const querySuffix = targetCompanyId ? `?companyId=${targetCompanyId}` : "";
+
     // Build Nav Groups
     const navGroups: { label?: string; items: any[] }[] = [];
 
-    // Worker Group
-    if (user?.is_active_worker || user?.role === 'admin') {
-        // Check if any company has worker_daily_report enabled
-        const dailyReportCompanies = myCompanies.filter((c: any) => {
-            const settings = c.settings || {};
-            // Support both new 'modules' and legacy 'features'
-            return (settings.modules?.worker_daily_report ?? settings.features?.worker_daily_report ?? true) === true;
+    const isPlatformAdmin = user?.role === 'admin' || user?.is_platform_admin;
+    const activeRole = user?.active_role;
+
+    // Platform Admin Logic: Exclusive visibility
+    if (isPlatformAdmin) {
+        // Platform Admin Group - ALWAYS show if they are platform admin
+        navGroups.push({
+            label: "Administración Plataforma",
+            items: adminNavItems
         });
 
-        const items = [...workerNavItems];
+        // Show Manager/Worker groups ONLY if they have explicitly switched context to one
+        if (activeRole === 'manager') {
+            const activeCompany = myCompanies.find((c: any) => c.id === targetCompanyId);
+            const settings = activeCompany?.settings || {};
+            const isBillingEnabled = (settings.modules?.billing ?? settings.features?.billing) === true;
+            
+            // Modules check for Reports
+            const reportsConfig = settings.modules?.reports ?? settings.features?.reports;
+            const hasReports = !!reportsConfig && (typeof reportsConfig === 'boolean' ? reportsConfig : (reportsConfig.enabled !== false));
 
-        if (dailyReportCompanies.length > 0) {
-            const targetId = dailyReportCompanies[0].id;
-            items.push({
-                href: `/supervisor/daily-reports?companyId=${targetId}`,
-                label: "Parte Diario",
-                icon: FileText
+            const managerItems = [
+                { href: `/manager/dashboard${querySuffix}`, label: "Dashboard", icon: LayoutDashboard },
+                { href: `/manager/daily-reports${querySuffix}`, label: "Parte Diario", icon: FileText },
+                { href: `/manager/users${querySuffix}`, label: "Usuarios", icon: Users },
+                { href: `/manager/shifts${querySuffix}`, label: "Turnos", icon: Calendar },
+            ];
+            if (isBillingEnabled) {
+                managerItems.push({ href: `/manager/billing${querySuffix}`, label: "Facturación", icon: Banknote });
+            }
+            if (hasReports) {
+                managerItems.push({ href: `/reports${querySuffix}`, label: "Informes", icon: FileText });
+            }
+
+            navGroups.push({
+                label: activeCompany?.name || "Manager Context",
+                items: managerItems
+            });
+        } else if (activeRole === 'worker') {
+            // Check if reports are enabled for ANY of the user's companies (since reports page handles company selection)
+            const hasAnyReports = user?.role === 'admin' || myCompanies.some((c: any) => {
+                const config = c.settings?.modules?.reports ?? c.settings?.features?.reports;
+                return !!config && (typeof config === 'boolean' ? config : (config.enabled !== false));
+            });
+
+            const items = [...workerNavItems];
+            if (hasAnyReports) {
+                items.push({ href: "/reports", label: "Informes Personales", icon: FileText });
+            }
+
+            navGroups.push({
+                label: "Worker Context",
+                items: items
+            });
+        }
+    } else {
+        // Regular User Logic (Current behavior)
+        if (activeRole === 'worker') {
+            const dailyReportCompanies = myCompanies.filter((c: any) => {
+                const settings = c.settings || {};
+                return (settings.modules?.worker_daily_report ?? settings.features?.worker_daily_report ?? true) === true;
+            });
+
+            // Reports check
+            const hasAnyReports = myCompanies.some((c: any) => {
+                const config = c.settings?.modules?.reports ?? c.settings?.features?.reports;
+                return !!config && (typeof config === 'boolean' ? config : (config.enabled !== false));
+            });
+
+            const items = [...workerNavItems];
+            if (dailyReportCompanies.length > 0) {
+                const targetId = dailyReportCompanies[0].id;
+                items.push({
+                    href: `/manager/daily-reports?companyId=${targetId}`,
+                    label: "Parte Diario",
+                    icon: FileText
+                });
+            }
+            if (hasAnyReports) {
+                items.push({ href: "/reports", label: "Informes Personales", icon: FileText });
+            }
+
+            navGroups.push({
+                label: "Perfil de Trabajador",
+                items: items
             });
         }
 
-        navGroups.push({
-            label: "Worker Profile",
-            items: items
-        });
-    }
+        if (activeRole === 'manager') {
+            const activeCompany = myCompanies.find((c: any) => c.id === targetCompanyId);
+            const settings = activeCompany?.settings || {};
+            const isBillingEnabled = (settings.modules?.billing ?? settings.features?.billing) === true;
+            
+            // Reports check
+            const reportsConfig = settings.modules?.reports ?? settings.features?.reports;
+            const hasReports = !!reportsConfig && (typeof reportsConfig === 'boolean' ? reportsConfig : (reportsConfig.enabled !== false));
 
-    // Supervisor Group
-    // Filter companies where user is manager or admin
-    const managedCompanies = myCompanies.filter((c: any) => {
-        const role = (c.role || '').toLowerCase();
-        return role === 'manager' || role === 'admin' || role === 'owner';
-    });
-
-    // Determine target company ID for links (persist current or default to first)
-    const targetCompanyId = currentCompanyId || (managedCompanies.length > 0 ? managedCompanies[0].id : null);
-    const querySuffix = targetCompanyId ? `?companyId=${targetCompanyId}` : "";
-
-    if (user?.is_supervisor || user?.role === 'admin') {
-        const activeCompany = myCompanies.find((c: any) => c.id === targetCompanyId);
-        const settings = activeCompany?.settings || {};
-        
-        // Billing is a premium module, so we check 'modules.billing' (or legacy 'features.billing')
-        const isBillingEnabled = (settings.modules?.billing ?? settings.features?.billing) === true;
-
-        const supervisorItems = [
-            { href: `/supervisor/dashboard${querySuffix}`, label: "Dashboard", icon: LayoutDashboard },
-            { href: `/supervisor/daily-reports${querySuffix}`, label: "Parte Diario", icon: FileText },
-            { href: `/supervisor/users${querySuffix}`, label: "Usuarios", icon: Users },
-            { href: `/supervisor/shifts${querySuffix}`, label: "Turnos", icon: Calendar },
-        ];
-
-        if (isBillingEnabled) {
-            supervisorItems.push({ href: `/supervisor/billing${querySuffix}`, label: "Facturación", icon: Banknote });
-        }
-
-        navGroups.push({
-            label: managedCompanies.length === 1 ? managedCompanies[0].name : "Supervisor",
-            items: supervisorItems
-        });
-    }
-
-    // Admin Group
-    if (user?.role === 'admin') {
-        navGroups.push({
-            label: "Administration",
-            items: adminNavItems
-        });
-    }
-
-    // Account Group (Common) - Restricted "Informes" to accessible companies
-    const accountItems = [];
-    
-    // Check if reports module is accessible in any company
-    const hasReportsAccess = user?.role === 'admin' || myCompanies.some((c: any) => {
-        const modules = c.settings?.modules || c.settings?.features || {};
-        const reportsConfig = modules.reports; // We'll stick to 'reports' as the primary ID
-
-        if (!reportsConfig) return false;
-        if (typeof reportsConfig === 'boolean') return reportsConfig;
-        if (typeof reportsConfig === 'object') {
-            if (reportsConfig.enabled === false) return false;
-            if (reportsConfig.access_level === 'managers') {
-                const role = String(c.role || '').toLowerCase();
-                return ['manager', 'admin', 'owner'].includes(role);
+            const managerItems = [
+                { href: `/manager/dashboard${querySuffix}`, label: "Dashboard", icon: LayoutDashboard },
+                { href: `/manager/daily-reports${querySuffix}`, label: "Parte Diario", icon: FileText },
+                { href: `/manager/users${querySuffix}`, label: "Usuarios", icon: Users },
+                { href: `/manager/shifts${querySuffix}`, label: "Turnos", icon: Calendar },
+            ];
+            if (isBillingEnabled) {
+                managerItems.push({ href: `/manager/billing${querySuffix}`, label: "Facturación", icon: Banknote });
             }
-            return true;
-        }
-        return false;
-    });
+            if (hasReports) {
+                managerItems.push({ href: `/reports${querySuffix}`, label: "Informes", icon: FileText });
+            }
 
-    if (hasReportsAccess) {
-        accountItems.push(...commonNavItems);
+            navGroups.push({
+                label: activeCompany?.name || "Manager",
+                items: managerItems
+            });
+        }
     }
 
-    navGroups.push({
-        label: "Account",
-        items: accountItems
-    });
+    // (Account Group removed: Informes moved to Manager/Worker sections)
 
     useEffect(() => {
         if (!loading && !user) {
@@ -193,8 +215,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         );
     }
 
-    // Condition for CompanySwitcher: Only if managing more than 1 company
-    const showCompanySwitcher = myCompanies.length > 1;
+    // ... (showCompanySwitcher removed)
 
     // ... (previous logic)
 
@@ -206,7 +227,6 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         params.set("companyId", companyId);
         const pathname = window.location.pathname;
         router.push(`${pathname}?${params.toString()}`);
-        setIsCompanyDialogOpen(false);
     };
 
     return (
@@ -214,7 +234,6 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             <div className="flex min-h-screen flex-col md:flex-row bg-slate-50">
                 <Sidebar
                     navGroups={navGroups}
-                    companySwitcher={showCompanySwitcher ? <CompanySwitcher companies={myCompanies} /> : null}
                 />
                 <main className="flex-1 overflow-x-hidden">
                     <div className="p-4 md:p-8">
@@ -222,32 +241,6 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                     </div>
                 </main>
 
-                <Dialog open={isCompanyDialogOpen} onOpenChange={(open) => !open && setIsCompanyDialogOpen(true)}>
-                    <DialogContent className="sm:max-w-md" onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
-                        <DialogHeader>
-                            <DialogTitle>Seleccionar Empresa</DialogTitle>
-                            <DialogDescription>
-                                Por favor, selecciona una empresa para continuar.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="grid gap-4 py-4">
-                            {managedCompanies.map((company) => (
-                                <Button
-                                    key={company.id}
-                                    variant="outline"
-                                    className="w-full justify-start h-auto py-3 text-left"
-                                    onClick={() => handleSelectCompany(company.id)}
-                                >
-                                    <Building2 className="mr-2 h-5 w-5 opacity-70" />
-                                    <div className="flex flex-col items-start">
-                                        <span className="font-semibold">{company.name}</span>
-                                        <span className="text-xs text-muted-foreground capitalize">{company.role}</span>
-                                    </div>
-                                </Button>
-                            ))}
-                        </div>
-                    </DialogContent>
-                </Dialog>
             </div>
         </SidebarProvider>
     );

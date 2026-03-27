@@ -24,28 +24,27 @@ import { Badge } from "@/components/ui/badge";
 import { X } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
-interface SupervisorAddWorkLogDialogProps {
+interface ManagerAddWorkLogDialogProps {
     companyId: string;
     companyName: string;
-    users: any[]; // List of eligible users (members of the company)
-    onLogUpdate?: () => void;
+    users: any[];
+    onSuccess?: () => void;
     children?: React.ReactNode;
-    // Controlled state props
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
     initialData?: Partial<WorkLog>;
 }
 
-export function SupervisorAddWorkLogDialog({
+export function ManagerAddWorkLogDialog({
     companyId,
     companyName,
     users,
-    onLogUpdate,
+    onSuccess,
     children,
     open: externalOpen,
     onOpenChange: setExternalOpen,
     initialData
-}: SupervisorAddWorkLogDialogProps) {
+}: ManagerAddWorkLogDialogProps) {
     const [internalOpen, setInternalOpen] = useState(false);
 
     // Use external state if provided, otherwise internal
@@ -157,7 +156,7 @@ export function SupervisorAddWorkLogDialog({
             }
 
             setOpen(false);
-            onLogUpdate?.();
+            onSuccess?.();
 
         } catch (error: any) {
             console.error("Error saving work log:", error);

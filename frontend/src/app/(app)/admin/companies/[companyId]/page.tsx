@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getCompaniesDetailed, updateMemberStatus, updateCompanyMember, notifyCompanyMember, getCompanyRates, updateCompany } from "@/lib/api/companies";
+import { getCompaniesDetailed, updateMemberStatus, updateCompanyMember, getCompanyRates, updateCompany } from "@/lib/api/companies";
 import { useParams, useRouter } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator, BreadcrumbPage } from "@/components/ui/breadcrumb";
@@ -10,11 +10,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Check, X, Shield, Mail, Loader2, Settings, Database, Pencil, FileJson, FileCode } from "lucide-react";
+import { Check, X, Shield, Loader2, Settings, Database, Pencil, FileJson, FileCode } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { AddMemberDialog } from "@/components/admin/add-member-dialog";
 import { CompanyConfigurationTab } from "@/components/admin/company-configuration-tab";
-import { MemberSettingsDialog } from "@/components/admin/member-settings-dialog";
 import { useAuth } from "@/context/AuthContext";
 import { CompanyMember, UserCompanyRate } from "@/lib/types";
 import { DailyReportView } from "@/components/admin/daily-report-view";
@@ -68,20 +68,12 @@ export default function CompanyDetailsPage() {
         onError: () => toast({ title: "Error al actualizar rol", variant: "destructive" })
     });
 
-    const notifyMutation = useMutation({
-        mutationFn: ({ userId }: { userId: string }) =>
-            notifyCompanyMember(companyId as string, userId),
-        onSuccess: () => {
-            toast({ title: "Notificación enviada", description: "El usuario ha recibido un correo." });
-        },
-        onError: () => toast({ title: "Error al enviar notificación", variant: "destructive" })
-    });
 
     if (isLoading) return <div className="p-8"><Loader2 className="animate-spin" /></div>;
     if (!company) return <div className="p-8">Empresa no encontrada</div>;
 
     const workers = company.members.filter(m => m.role === 'worker');
-    const supervisors = company.members.filter(m => m.role === 'manager');
+    const managers = company.members.filter(m => m.role === 'manager');
 
     const memberColumns: ColumnDef<CompanyMember>[] = [
         {
@@ -95,13 +87,25 @@ export default function CompanyDetailsPage() {
             )
         },
         {
-            accessorKey: "status",
-            header: "Estado",
-            cell: ({ row }) => (
-                <Badge variant={row.original.is_active ? 'default' : 'destructive'}>
-                    {row.original.is_active ? 'Activo' : 'Inactivo'}
-                </Badge>
-            )
+            id: "active",
+            header: "Activo",
+            cell: ({ row }) => {
+                const member = row.original;
+                return (
+                    <div 
+                        className="flex items-center"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <Switch
+                            checked={member.is_active}
+                            onCheckedChange={(checked) => statusMutation.mutate({
+                                userId: member.userId,
+                                status: checked ? 'active' : 'rejected'
+                            })}
+                        />
+                    </div>
+                );
+            }
         },
         {
             id: "actions",
@@ -114,8 +118,11 @@ export default function CompanyDetailsPage() {
                             <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => roleMutation.mutate({ userId: member.userId, role: 'manager' })}
-                                title="Promover a Supervisor"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    roleMutation.mutate({ userId: member.userId, role: 'manager' });
+                                }}
+                                title="Promover a Manager"
                             >
                                 <Shield className="h-4 w-4 mr-1 text-indigo-600" />
                                 Promover
@@ -124,35 +131,15 @@ export default function CompanyDetailsPage() {
                             <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => roleMutation.mutate({ userId: member.userId, role: 'worker' })}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    roleMutation.mutate({ userId: member.userId, role: 'worker' });
+                                }}
                                 title="Degradar a Trabajador"
                             >
                                 Degradar
                             </Button>
                         )}
-
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className={member.is_active ? "text-red-600" : "text-green-600"}
-                            onClick={() => statusMutation.mutate({
-                                userId: member.userId,
-                                status: member.is_active ? 'rejected' : 'active'
-                            })}
-                        >
-                            {member.is_active ? <X className="h-4 w-4" /> : <Check className="h-4 w-4" />}
-                        </Button>
-
-                        <Button variant="ghost" size="icon" onClick={() => notifyMutation.mutate({ userId: member.userId })} title="Enviar Notificación">
-                            <Mail className="h-4 w-4" />
-                        </Button>
-
-                        <MemberSettingsDialog
-                            companyId={company.id}
-                            userId={member.userId}
-                            memberName={(member.user?.first_name || '') + ' ' + (member.user?.last_name || '')}
-                            initialSettings={member.settings}
-                        />
                     </div>
                 );
             }
@@ -188,7 +175,7 @@ export default function CompanyDetailsPage() {
             <Tabs defaultValue="workers" className="w-full">
                 <TabsList className="bg-slate-100 dark:bg-slate-900 p-1 rounded-lg">
                     <TabsTrigger value="workers">Trabajadores ({workers.length})</TabsTrigger>
-                    <TabsTrigger value="supervisors">Supervisores ({supervisors.length})</TabsTrigger>
+                    <TabsTrigger value="managers">Managers ({managers.length})</TabsTrigger>
                     <TabsTrigger value="taxes">Tasas & IRPF</TabsTrigger>
                     <TabsTrigger value="settings">Ajustes UI</TabsTrigger>
                     {user?.role === 'admin' && (
@@ -207,20 +194,38 @@ export default function CompanyDetailsPage() {
                             <CardDescription>Gestión de personal de campo y sus permisos.</CardDescription>
                         </CardHeader>
                         <CardContent className="px-0">
-                            <DataTable columns={memberColumns} data={workers} searchKey="user" searchPlaceholder="Buscar trabajador..." />
+                            <DataTable 
+                                columns={memberColumns} 
+                                data={workers} 
+                                searchKey="user" 
+                                searchPlaceholder="Buscar trabajador..." 
+                                onRowClick={(row) => {
+                                    const path = user?.role === 'admin' ? `/admin/users/${row.userId}` : `/manager/users/${row.userId}`;
+                                    router.push(path);
+                                }}
+                            />
                         </CardContent>
                     </Card>
                 </TabsContent>
 
-                {/* SUPERVISORS TAB */}
-                <TabsContent value="supervisors" className="pt-4">
+                {/* MANAGERS TAB */}
+                <TabsContent value="managers" className="pt-4">
                     <Card className="border-none shadow-none bg-transparent">
                         <CardHeader className="px-0">
-                            <CardTitle>Supervisores</CardTitle>
+                            <CardTitle>Managers</CardTitle>
                             <CardDescription>Usuarios con privilegios de gestión en esta empresa.</CardDescription>
                         </CardHeader>
                         <CardContent className="px-0">
-                            <DataTable columns={memberColumns} data={supervisors} searchKey="user" searchPlaceholder="Buscar supervisor..." />
+                            <DataTable 
+                                columns={memberColumns} 
+                                data={managers} 
+                                searchKey="user" 
+                                searchPlaceholder="Buscar manager..." 
+                                onRowClick={(row) => {
+                                    const path = user?.role === 'admin' ? `/admin/users/${row.userId}` : `/manager/users/${row.userId}`;
+                                    router.push(path);
+                                }}
+                            />
                         </CardContent>
                     </Card>
                 </TabsContent>

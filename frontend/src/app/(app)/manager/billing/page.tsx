@@ -3,8 +3,8 @@
 import { useState, useMemo } from "react";
 import { DateRange } from "react-day-picker";
 import { startOfMonth, endOfMonth, format, eachDayOfInterval, parseISO, addMonths, subMonths } from "date-fns";
-import { DateRangeFilter } from "@/components/supervisor/date-range-filter";
-import { BillingTable, BillingRow } from "@/components/supervisor/billing-table";
+import { DateRangeFilter } from "@/components/manager/date-range-filter";
+import { BillingTable, BillingRow } from "@/components/manager/billing-table";
 import { getWorkLogs } from "@/lib/api/work-logs";
 import { getCompanyMembers, getCompanyRates } from "@/lib/api/companies";
 import { useQuery } from "@tanstack/react-query";
@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 
-export default function SupervisorBillingPage() {
+export default function ManagerBillingPage() {
     const searchParams = useSearchParams();
     const selectedCompanyId = searchParams.get("companyId");
 

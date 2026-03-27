@@ -15,11 +15,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { WorkLogDetailsDialog } from "@/components/work-log/details-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { SupervisorAddWorkLogDialog } from "@/components/work-log/supervisor-add-log-dialog";
+import { ManagerAddWorkLogDialog } from "@/components/work-log/manager-add-log-dialog";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
 
-export default function SupervisorDailyReportPage() {
+export default function ManagerDailyReportPage() {
     const { user: currentUser } = useAuth();
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -47,7 +47,7 @@ export default function SupervisorDailyReportPage() {
     const managedCompanies = useMemo(() => {
         return myCompanies.filter((c: any) => {
             const role = (c.role || c.pivot?.role || '').toLowerCase();
-            const isManager = ['manager', 'admin', 'owner', 'supervisor'].includes(role);
+            const isManager = ['manager', 'admin', 'owner'].includes(role);
             const settings = c.settings || {};
             // Support both new 'modules' and legacy 'features'
             const canViewReport = (settings.modules?.worker_daily_report ?? settings.features?.worker_daily_report ?? true) === true;
@@ -88,14 +88,14 @@ export default function SupervisorDailyReportPage() {
     // 3. Fetch Logs (We might need to fetch all and filter by companyId and date)
     // Ideally existing API supports companyId filter.
     // If getWorkLogs supports { companyId: ... } it's best.
-    const { data: workLogs = [], isLoading: loadingLogs } = useQuery({
+    const { data: workLogs = [], isLoading: logsLoading } = useQuery({
         queryFn: () => getWorkLogs({
             startDate: format(date, 'yyyy-MM-dd'),
             endDate: format(date, 'yyyy-MM-dd'),
             limit: 2000,
             companyId: selectedCompanyId
         }),
-        queryKey: ["work-logs-daily-supervisor", date.toISOString().split('T')[0], selectedCompanyId],
+        queryKey: ["work-logs-daily-manager", date.toISOString().split('T')[0], selectedCompanyId],
         enabled: !!selectedCompanyId
     });
 
@@ -251,8 +251,8 @@ export default function SupervisorDailyReportPage() {
 
                                         {/* Mobile View: Initials */}
                                         <div
-                                            className={cn("md:hidden w-full h-full flex items-center justify-center", currentUser?.is_supervisor ? "cursor-pointer" : "cursor-default")}
-                                            onClick={() => currentUser?.is_supervisor && router.push(`/supervisor/users/${user.id}`)}
+                                            className={cn("md:hidden w-full h-full flex items-center justify-center", currentUser?.is_manager ? "cursor-pointer" : "cursor-default")}
+                                            onClick={() => currentUser?.is_manager && router.push(`/manager/users/${user.id}`)}
                                         >
                                             <div className={cn(
                                                 "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border",
@@ -264,8 +264,8 @@ export default function SupervisorDailyReportPage() {
 
                                         {/* Desktop View: Full Details */}
                                         <div
-                                            className={cn("hidden md:block hover:underline truncate flex-1", currentUser?.is_supervisor ? "cursor-pointer" : "cursor-default")}
-                                            onClick={() => currentUser?.is_supervisor && router.push(`/supervisor/users/${user.id}`)}
+                                            className={cn("hidden md:block hover:underline truncate flex-1", currentUser?.is_manager ? "cursor-pointer" : "cursor-default")}
+                                            onClick={() => currentUser?.is_manager && router.push(`/manager/users/${user.id}`)}
                                         >
                                             <span className="font-medium text-sm">{user.first_name} {user.last_name}</span>
                                             <div className="flex gap-1 mt-1">
@@ -372,85 +372,20 @@ export default function SupervisorDailyReportPage() {
 
             {/* Create Dialog */}
             {selectedCompanyId && (
-                <SupervisorAddWorkLogDialog
+                <ManagerAddWorkLogDialog
                     open={createLogState.open}
                     onOpenChange={(open) => setCreateLogState(prev => ({ ...prev, open }))}
                     initialData={createLogState.data}
-                    companyId={selectedCompanyId}
+                    companyId={selectedCompanyId || ""}
                     companyName={managedCompanies.find(c => c.id === selectedCompanyId)?.name || "Company"}
                     users={companyUsers}
-                    onLogUpdate={() => {
-                        queryClient.invalidateQueries({ queryKey: ["work-logs-daily-supervisor"] });
+                    onSuccess={() => {
+                        queryClient.invalidateQueries({ queryKey: ["work-logs-daily-manager"] });
                         setCreateLogState({ open: false });
                     }}
                 >
-                    {/* Explicitly pass empty children or null to prevent default button rendering if the component logic dictates it, 
-                       but actually I am just removing the OLD invocation if it exists. 
-                       Wait, the user sees a button at the bottom. 
-                       Looking at previous file content, I see:
-                       
-                       {selectedCompanyId && (
-                        <SupervisorAddWorkLogDialog
-                            companyId={selectedCompanyId}
-                            ...
-                        />
-                       )}
-                       
-                       at lines 170-179 (Top Header) - which I REPLACED with a Button that sets state.
-                       
-                       AND another one at lines 312-321 (Bottom) - which acts as the Dialog instance.
-                       
-                       BUT wait, the user image shows:
-                       Top Right: "Add Log" (Black button)
-                       Bottom Left: "Añadir Registro" (Black button with Plus Icon)
-                       
-                       The "Añadir Registro" button comes from the default trigger of SupervisorAddWorkLogDialog if no children are passed.
-                       
-                       I need to ensure the Dialog instance at the bottom DOES NOT render a trigger button.
-                       I checked my change in previous turn...
-                       
-                       Turn 616:
-                       I added `children?: React.ReactNode` and support for external control.
-                       Original code:
-                       <DialogTrigger asChild>
-                           {children ?? (
-                               <Button> ... Añadir Registro ... </Button>
-                           )}
-                       </DialogTrigger>
-                       
-                       So if I pass `children={<></>}` or `children={null}` it might render nothing as trigger?
-                       Wait, DialogTrigger requires a child element to bind props to if asChild is true.
-                       If I want NO trigger (controlled only), I should wrap it or adjust component.
-                       
-                       Actually, looking at `SupervisorAddWorkLogDialog`:
-                       Wrapper is:
-                       <Dialog open={open} ...>
-                           <DialogTrigger asChild> ... </DialogTrigger>
-                           
-                       If `open` is controlled, we might not need a Trigger if we open it via state.
-                       But typical shadcn Dialog pattern expects a trigger or consistent structure.
-                       
-                       However, I can just pass a hidden element as children?
-                       <span className="hidden" />
-                       
-                       Let's check the bottom invocation in `page.tsx`:
-                       It is:
-                        <SupervisorAddWorkLogDialog
-                            open={createLogState.open}
-                            ...
-                        />
-                        
-                       It has no children prop. So it renders the default "Añadir Registro" button.
-                       
-                       I will modify the bottom invocation to pass a hidden trigger or adjust the component to support "no trigger" mode better, 
-                       but passing a hidden span is easiest without changing component again.
-                       
-                       OR better: The top button "Add Log" calls `setCreateLogState({ open: true })`.
-                       So the bottom dialog IS the responding component.
-                       I just need to hide its trigger.
-                   */}
                     <span className="hidden" />
-                </SupervisorAddWorkLogDialog>
+                </ManagerAddWorkLogDialog>
             )}
         </div>
     );

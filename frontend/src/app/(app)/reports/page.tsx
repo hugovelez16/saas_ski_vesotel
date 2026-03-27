@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, startOfMonth, endOfMonth, setMonth, setYear } from "date-fns";
 import { es } from "date-fns/locale";
@@ -143,7 +143,7 @@ export default function ReportsPage() {
         to: new Date()
     });
 
-    const isAdminOrSupervisor = useMemo(() => {
+    const isAdminOrManager = useMemo(() => {
         if (!user) return false;
         if (user.role === 'admin') return true;
         if (selectedCompanyId) {
@@ -154,13 +154,13 @@ export default function ReportsPage() {
         return false;
     }, [user, companies, selectedCompanyId]);
 
-    // Force individual mode for non-supervisors
-    useMemo(() => {
-        if (!isAdminOrSupervisor) {
+    // Force individual mode for non-managers
+    useEffect(() => {
+        if (!isAdminOrManager) {
             setReportType('individual');
             setSelectedUserId('me');
         }
-    }, [isAdminOrSupervisor]);
+    }, [isAdminOrManager]);
 
     // Text Summary State
     const [textDialogOpen, setTextDialogOpen] = useState(false);
@@ -619,8 +619,8 @@ export default function ReportsPage() {
                             </div>
                         )}
 
-                        {/* Report Type - Admin/Supervisor Only */}
-                        {isAdminOrSupervisor && companies.length > 0 && (
+                        {/* Report Type - Admin/Manager Only */}
+                        {isAdminOrManager && companies.length > 0 && (
                             <div className="space-y-2">
                                 <Label>Tipo de Informe</Label>
                                 <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-900 p-1 rounded-md">
@@ -645,8 +645,8 @@ export default function ReportsPage() {
                         )}
                     </div>
 
-                    {/* User Selector (Only if Individual + Admin/Supervisor) */}
-                    {reportType === 'individual' && isAdminOrSupervisor && (
+                    {/* User Selector (Only if Individual + Admin/Manager) */}
+                    {reportType === 'individual' && isAdminOrManager && (
                         <div className="space-y-2">
                             <Label>Empleado</Label>
                             <Select value={selectedUserId} onValueChange={setSelectedUserId}>

@@ -23,7 +23,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { ColumnDef } from "@tanstack/react-table";
 import { Badge } from "@/components/ui/badge";
 
-export default function SupervisorShiftsPage() {
+export default function ManagerShiftsPage() {
     const { user } = useAuth();
     const searchParams = useSearchParams();
     const [filters, setFilters] = useState<Record<string, any>>({});

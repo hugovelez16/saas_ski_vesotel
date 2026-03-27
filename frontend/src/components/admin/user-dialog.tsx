@@ -20,7 +20,6 @@ import {
     FormItem,
     FormLabel,
     FormMessage,
-    FormDescription,
 } from "@/components/ui/form";
 import {
     Select,
@@ -32,11 +31,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { createUser } from "@/lib/api/users";
+import { getCompanies } from "@/lib/api/companies";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Mail, User, Shield, UserPlus, CheckCircle2 } from "lucide-react";
+import { Plus, Mail, User, Shield, UserPlus, CheckCircle2, Activity, Building } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { CompanyResponse } from "@/lib/types";
 
 const formSchema = z.object({
     email: z.string().email("Please enter a valid email address"),
@@ -44,6 +45,8 @@ const formSchema = z.object({
     last_name: z.string().min(2, "Last name must be at least 2 characters"),
     role: z.enum(["admin", "user"]),
     is_active: z.boolean().default(true),
+    company_id: z.string().optional(),
+    send_email: z.boolean().default(true),
 });
 
 export function UserDialog() {
@@ -59,7 +62,15 @@ export function UserDialog() {
             last_name: "",
             role: "user",
             is_active: true,
+            company_id: "",
+            send_email: true,
         },
+    });
+
+    const { data: companies = [] } = useQuery({
+        queryKey: ["companies"],
+        queryFn: getCompanies,
+        enabled: open,
     });
 
     const mutation = useMutation({
@@ -84,7 +95,12 @@ export function UserDialog() {
     });
 
     function onSubmit(values: z.infer<typeof formSchema>) {
-        mutation.mutate(values);
+        const payload = {
+            ...values,
+            companyId: values.company_id === "none" ? null : values.company_id,
+            sendEmail: values.send_email,
+        };
+        mutation.mutate(payload);
     }
 
     return (
@@ -178,7 +194,7 @@ export function UserDialog() {
                                 )}
                             />
 
-                            <div className="grid grid-cols-2 gap-4 items-end">
+                            <div className="grid grid-cols-2 gap-4">
                                 <FormField
                                     control={form.control}
                                     name="role"
@@ -208,18 +224,75 @@ export function UserDialog() {
                                     control={form.control}
                                     name="is_active"
                                     render={({ field }) => (
-                                        <FormItem className="flex flex-row items-center justify-between rounded-lg border border-muted-foreground/20 p-3 bg-background/50 h-[40px]">
-                                            <div className="space-y-0.5">
-                                                <FormLabel className="text-sm font-medium flex items-center gap-2">
-                                                    Active
-                                                </FormLabel>
-                                            </div>
+                                        <FormItem>
+                                            <FormLabel className="flex items-center gap-2 text-sm font-medium">
+                                                <Activity className="h-3.5 w-3.5 text-muted-foreground" />
+                                                Active Status
+                                            </FormLabel>
                                             <FormControl>
-                                                <Switch
-                                                    checked={field.value}
-                                                    onCheckedChange={field.onChange}
-                                                />
+                                                <div className="flex items-center justify-between rounded-lg border border-muted-foreground/20 px-3 bg-background/50 h-[40px]">
+                                                    <span className="text-sm text-muted-foreground">Enabled</span>
+                                                    <Switch
+                                                        checked={field.value}
+                                                        onCheckedChange={field.onChange}
+                                                    />
+                                                </div>
                                             </FormControl>
+                                            <FormMessage className="text-xs" />
+                                        </FormItem>
+                                    )}
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <FormField
+                                    control={form.control}
+                                    name="company_id"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel className="flex items-center gap-2 text-sm font-medium">
+                                                <Building className="h-3.5 w-3.5 text-muted-foreground" />
+                                                Company Link
+                                            </FormLabel>
+                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                                <FormControl>
+                                                    <SelectTrigger className="bg-background/50 border-muted-foreground/20">
+                                                        <SelectValue placeholder="No company (Personal)" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    <SelectItem value="none">No company (Personal)</SelectItem>
+                                                    {companies.map((company: CompanyResponse) => (
+                                                        <SelectItem key={company.id} value={company.id}>
+                                                            {company.name}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <FormMessage className="text-xs" />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                <FormField
+                                    control={form.control}
+                                    name="send_email"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel className="flex items-center gap-2 text-sm font-medium">
+                                                <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                                                Welcome Email
+                                            </FormLabel>
+                                            <FormControl>
+                                                <div className="flex items-center justify-between rounded-lg border border-muted-foreground/20 px-3 bg-background/50 h-[40px]">
+                                                    <span className="text-sm text-muted-foreground">Notify User</span>
+                                                    <Switch
+                                                        checked={field.value}
+                                                        onCheckedChange={field.onChange}
+                                                    />
+                                                </div>
+                                            </FormControl>
+                                            <FormMessage className="text-xs" />
                                         </FormItem>
                                     )}
                                 />

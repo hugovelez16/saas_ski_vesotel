@@ -35,8 +35,8 @@ export function CompanySwitcher({ companies }: CompanySwitcherProps) {
 
     const onSelectCompany = (value: string) => {
         if (value === "overview") {
-            const isManager = pathname.includes('/supervisor') || pathname.includes('/admin');
-            router.push(isManager ? '/supervisor/dashboard' : '/dashboard');
+            const isManager = pathname.includes('/manager') || pathname.includes('/admin');
+            router.push(isManager ? '/manager/dashboard' : '/dashboard');
             return;
         }
 
@@ -61,7 +61,7 @@ export function CompanySwitcher({ companies }: CompanySwitcherProps) {
 
     return (
         <Select
-            value={selectedCompany?.id || (pathname === '/supervisor/dashboard' && !currentCompanyId ? "overview" : "")}
+            value={selectedCompany?.id || (pathname === '/manager/dashboard' && !currentCompanyId ? "overview" : "")}
             onValueChange={onSelectCompany}
         >
             <SelectTrigger className="w-full bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700 focus:ring-0 focus:ring-offset-0">

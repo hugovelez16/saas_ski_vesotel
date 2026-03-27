@@ -11,7 +11,7 @@ import { useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 
-export default function SupervisorUsersPage() {
+export default function ManagerUsersPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const companyIdParam = searchParams.get("companyId");
@@ -141,7 +141,7 @@ export default function SupervisorUsersPage() {
                 searchPlaceholder="Buscar por email..."
                 onRowClick={(user) => {
                     const query = companyIdParam ? `?companyId=${companyIdParam}` : "";
-                    router.push(`/supervisor/users/${user.id}${query}`);
+                    router.push(`/manager/users/${user.id}${query}`);
                 }}
             />
         </div>

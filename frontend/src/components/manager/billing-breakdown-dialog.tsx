@@ -95,7 +95,7 @@ export function BillingBreakdownDialog({ open, onOpenChange, row }: BillingBreak
                     <Button variant="outline" onClick={() => onOpenChange(false)}>
                         Cerrar
                     </Button>
-                    <Button onClick={() => router.push(`/supervisor/users/${row.userId}`)}>
+                    <Button onClick={() => router.push(`/manager/users/${row.userId}`)}>
                         <User className="mr-2 h-4 w-4" />
                         Ver Detalles de Usuario
                     </Button>

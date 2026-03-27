@@ -3,11 +3,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { getMyCompanies } from "@/lib/api/companies";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { CompanyDashboard } from "@/components/supervisor/company-dashboard";
+import { CompanyDashboard } from "@/components/manager/company-dashboard";
 import { useEffect, useMemo } from "react";
 import { Building2 } from "lucide-react";
 
-export default function SupervisorDashboardPage() {
+export default function ManagerDashboardPage() {
     const router = useRouter();
     const pathname = usePathname();
     const searchParams = useSearchParams();
