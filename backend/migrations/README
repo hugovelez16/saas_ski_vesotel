@@ -1,1 +1,46 @@
-Generic single-database configuration.
+# Database Migrations (Alembic)
+
+This directory contains the database migration scripts managed by **Alembic**. Migrations allow for version-controlled changes to the database schema.
+
+## 🚀 Basic Usage
+
+All migration commands should be executed within the backend Docker container using the development configuration.
+
+### 🔌 Applying Migrations
+To bring your database schema up to the latest version:
+```bash
+docker compose -f docker-compose.dev.yml exec backend alembic upgrade head
+```
+
+### 🆕 Creating a New Migration
+When you modify your SQLAlchemy models in `models.py`, generate a new migration script automatically:
+```bash
+docker compose -f docker-compose.dev.yml exec backend alembic revision --autogenerate -m "describe your changes"
+```
+> [!IMPORTANT]
+> Always review the generated script in `backend/migrations/versions/` before applying it. Autogenerate is good but not perfect (e.g., it may not detect table renames correctly).
+
+### ⏪ Rolling Back
+To undo the last migration:
+```bash
+docker compose -f docker-compose.dev.yml exec backend alembic downgrade -1
+```
+
+### 🔍 Inspection
+- **Current version**: `docker compose -f docker-compose.dev.yml exec backend alembic current`
+- **Migration history**: `docker compose -f docker-compose.dev.yml exec backend alembic history`
+
+---
+
+## 🛠 Workflow for Schema Changes
+
+1. **Modify Models**: Update `backend/models.py` with your changes.
+2. **Generate Migration**: Run the `revision --autogenerate` command above.
+3. **Review**: Check the new file in `backend/migrations/versions/`.
+4. **Apply**: Run `upgrade head`.
+5. **Verify**: Ensure the backend starts correctly and your changes are reflected in the DB.
+
+## ❓ Troubleshooting
+
+- **Database Connection**: If Alembic can't connect, ensure the `postgres` service is running and your `.env` variables are correct.
+- **Import Errors**: Ensure all models are imported in `backend/migrations/env.py` for autogenerate to work correctly (currently handled by `import models`).
