@@ -77,16 +77,22 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     """Schema for creating a new user (registration)."""
     password: Optional[str] = None
+    company_id: Optional[UUID] = None
+    send_email: bool = True
 
 class UserResponse(UserBase):
     """Schema for User response data, excluding sensitive info like passwords."""
     id: UUID
     role: str
     is_active: bool
-    is_supervisor: bool = False # Computed
+    is_manager: bool = False # Computed
     is_active_worker: bool = False # Computed
     must_change_password: bool = False
     is_2fa_enabled: bool = False # TOTP status
+    is_impersonated: bool = False # SRE: Support impersonation UI
+    is_platform_admin: bool = False
+    active_company_id: Optional[UUID] = None
+    active_role: Optional[str] = None
     default_company_id: Optional[UUID] = None
     created_at: datetime
     
@@ -209,7 +215,11 @@ class TOTPActivate(BaseModel):
 
 
 class TokenData(BaseModel):
-    email: Optional[str] = None
+    user_id: Optional[str] = None
+    company_id: Optional[str] = None
+    company_role: Optional[str] = None
+    is_platform_admin: bool = False
+    scope: str = "full"
 
 class SessionResponse(CamelModel):
     id: UUID

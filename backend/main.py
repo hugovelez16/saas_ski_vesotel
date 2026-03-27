@@ -21,62 +21,43 @@ from sqlalchemy.exc import OperationalError
 # Create tables if they don't exist (Legacy approach, now using Alembic)
 # models.Base.metadata.create_all(bind=engine)
 
-def check_supervisor_access(db: Session, supervisor_id: str, target_user_id: str) -> bool:
+def check_manager_access(db: Session, manager: models.User, target_user_id: str) -> bool:
     """
-    Check if supervisor_id manages any company that target_user_id is a member of.
+    SRE: Check if manager has active manager scope for target user's company.
     """
-    # 0. Global Admin Bypass
-    supervisor = db.query(models.User).filter(models.User.id == supervisor_id).first()
-    if supervisor and supervisor.role == models.UserRole.admin:
+    is_platform_admin = getattr(manager, "is_platform_admin", False)
+    if is_platform_admin:
         return True
-
-    # 1. Get all memberships of supervisor
-    sup_memberships = db.query(models.CompanyMember).filter(
-        models.CompanyMember.user_id == supervisor_id,
-        models.CompanyMember.is_active == True
-    ).all()
+        
+    active_cid = getattr(manager, "active_company_id", None)
+    active_role = getattr(manager, "active_role", None)
     
-    # Filter for elevated roles (manager, admin, owner, supervisor)
-    # matching the frontend logic
-    elevated_company_ids = []
-    for m in sup_memberships:
-        # Handle Enum or String
-        role_val = str(m.role.value if hasattr(m.role, 'value') else m.role).lower()
-        if role_val in ['manager', 'admin', 'owner', 'supervisor']:
-            elevated_company_ids.append(m.company_id)
-            
-    if not elevated_company_ids:
+    if not active_cid or active_role != "manager":
         return False
-
-    # 2. Check if target_user is a member of any of these companies
+        
+    # Check if target_user is a member of THIS active company
     access = db.query(models.CompanyMember).filter(
         models.CompanyMember.user_id == target_user_id,
-        models.CompanyMember.company_id.in_(elevated_company_ids),
+        models.CompanyMember.company_id == active_cid,
         models.CompanyMember.is_active == True
     ).first()
-
+    
     return bool(access)
 
 def is_manager_of_company(db: Session, user: models.User, company_id: Any) -> bool:
     """
-    Check if a user is a manager/admin of a context company.
-    Global admins always have access.
+    SRE: Check if user has active manager scope in the specified company.
     """
-    if user.role == models.UserRole.admin:
+    if getattr(user, "is_platform_admin", False):
         return True
+        
+    active_cid = getattr(user, "active_company_id", None)
+    active_role = getattr(user, "active_role", None)
     
-    # Handle string or UUID
-    from uuid import UUID
-    cid = UUID(company_id) if isinstance(company_id, str) else company_id
-    
-    membership = db.query(models.CompanyMember).filter(
-        models.CompanyMember.user_id == user.id,
-        models.CompanyMember.company_id == cid,
-        models.CompanyMember.role.in_([models.CompanyRole.manager, models.CompanyRole.admin, models.CompanyRole.owner]),
-        models.CompanyMember.is_active == True
-    ).first()
-    
-    return bool(membership)
+    if str(active_cid) == str(company_id) and active_role == "manager":
+        return True
+        
+    return False
 
 
 @asynccontextmanager
@@ -162,19 +143,28 @@ async def login_for_access_token(
     # Check if 2FA is required
     if user.is_2fa_enabled:
         # Issue provisional token (short lived, specific scope)
+        # SRE: Use user ID as sub
         provisional_token = auth.create_access_token(
-            data={"sub": user.email, "scope": "2fa_pending"},
+            data={"sub": str(user.id), "scope": "2fa_pending"},
             expires_delta=timedelta(minutes=5)
         )
+        # Set provisional access token as cookie
+        response.set_cookie(
+            key="access_token",
+            value=provisional_token,
+            httponly=True,
+            secure=True,
+            samesite="lax",
+            max_age=300 # 5 mins
+        )
         return {
-            "access_token": provisional_token,
+            "access_token": "cookie", # Signal that it's in a cookie
             "token_type": "bearer",
             "requires_2fa": True
         }
 
-    # No 2FA: Create full session
-    access_token = auth.create_access_token(data={"sub": user.email, "scope": "full"})
-    refresh_token = auth.create_refresh_token(data={"sub": user.email})
+    # No 2FA: Create full session with default scope
+    access_token, refresh_token = auth.generate_user_tokens(db, user)
     
     # Store session in DB
     auth.create_session(
@@ -185,18 +175,26 @@ async def login_for_access_token(
         ip_address=request.client.host
     )
     
-    # Set HttpOnly Cookie for Refresh Token
+    # Set HttpOnly Cookies for both tokens
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=True, 
+        samesite="lax",
+        max_age=auth.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    )
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        secure=True, # Should be True in production
+        secure=True,
         samesite="lax",
         max_age=auth.REFRESH_TOKEN_EXPIRE_DAYS * 86400
     )
 
     return {
-        "access_token": access_token, 
+        "access_token": "cookie", 
         "token_type": "bearer",
         "requires_2fa": False
     }
@@ -223,9 +221,8 @@ async def verify_2fa(
     if not auth.verify_totp_code(decrypted_secret, data.code):
         raise HTTPException(status_code=400, detail="Invalid verification code")
     
-    # Issue Full Tokens
-    access_token = auth.create_access_token(data={"sub": current_user.email, "scope": "full"})
-    refresh_token = auth.create_refresh_token(data={"sub": current_user.email})
+    # Issue Full Tokens with default scope
+    access_token, refresh_token = auth.generate_user_tokens(db, current_user)
     
     # Create Session
     auth.create_session(
@@ -236,7 +233,15 @@ async def verify_2fa(
         ip_address=request.client.host
     )
 
-    # Cookie
+    # Cookies
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=auth.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    )
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
@@ -247,7 +252,7 @@ async def verify_2fa(
     )
 
     return {
-        "access_token": access_token, 
+        "access_token": "cookie", 
         "token_type": "bearer",
         "requires_2fa": False
     }
@@ -268,23 +273,161 @@ async def refresh_access_token(
     
     # Verify JWT integrity & expiry
     try:
-        payload = auth.jwt.decode(refresh_token, auth.SECRET_KEY, algorithms=[auth.ALGORITHM])
+        # SRE: Use PUBLIC_KEY and RS256
+        payload = auth.jwt.decode(refresh_token, auth.PUBLIC_KEY, algorithms=[auth.ALGORITHM])
         if payload.get("type") != "refresh":
              raise auth.JWTError()
-        email = payload.get("sub")
+        user_id = payload.get("sub")
     except auth.JWTError:
         auth.revoke_session(db, refresh_token)
         raise HTTPException(status_code=401, detail="Token expired or corrupted")
     
-    # Issue new Access Token
-    new_access_token = auth.create_access_token(data={"sub": email, "scope": "full"})
+    # Issue new Access Token matching current context if possible
+    # We can fetch the user and generate new tokens
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+
+    # Try to extract current cid/role from headers/cookies if needed, 
+    # but for refresh we'll just stick to defaults or last known.
+    # Actually, generate_user_tokens defaults are fine here.
+    new_access_token, _ = auth.generate_user_tokens(db, user)
     
-    # Optional: Rotate Refresh Token (Strict strategy)
-    # new_refresh_token = auth.create_refresh_token(data={"sub": email})
-    # auth.revoke_session(db, refresh_token)
-    # auth.create_session(...)
+    # Set as cookie
+    response.set_cookie(
+        key="access_token",
+        value=new_access_token,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=auth.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    )
     
-    return {"access_token": new_access_token, "token_type": "bearer"}
+    return {"access_token": "cookie", "token_type": "bearer"}
+
+@app.post("/logout")
+async def logout(
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db)
+):
+    # 1. Get tokens from cookies
+    access_token = request.cookies.get("access_token")
+    refresh_token = request.cookies.get("refresh_token")
+    
+    # 2. Blacklist Access Token (if exists)
+    if access_token:
+        auth.blacklist_token(access_token)
+        
+    # 3. Revoke Session in DB (if exists)
+    if refresh_token:
+        auth.revoke_session(db, refresh_token)
+        
+    # 4. Clear Cookies
+    response.delete_cookie("access_token")
+    response.delete_cookie("refresh_token")
+    response.delete_cookie("admin_access_token") # Also clear backups if any
+    response.delete_cookie("admin_refresh_token")
+    
+    return {"message": "Logged out successfully"}
+
+@app.post("/auth/switch-scope", response_model=schemas.Token)
+async def switch_scope(
+    data: schemas.TokenData, 
+    response: Response,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_verified_user)
+):
+    """
+    SaaS: Switch active company and role context.
+    Issues NEW JWT cookies.
+    """
+    # Platform Admins can switch to ANY company and ANY role, OR reset to pure admin
+    if current_user.role == models.UserRole.admin:
+        if not data.company_id:
+            # Special case: Reset to Admin ONLY context
+            access_token, refresh_token = auth.generate_user_tokens(
+                db, current_user, company_id=None, role=None, force_none=True
+            )
+        else:
+            requested_role = data.company_role or "manager"
+            access_token, refresh_token = auth.generate_user_tokens(
+                db, current_user, company_id=data.company_id, role=requested_role
+            )
+    else:
+        # Verify membership and role for regular users
+        if not data.company_id:
+            raise HTTPException(status_code=400, detail="company_id is required")
+            
+        membership = db.query(models.CompanyMember).filter(
+            models.CompanyMember.user_id == current_user.id,
+            models.CompanyMember.company_id == data.company_id,
+            models.CompanyMember.is_active == True
+        ).first()
+        
+        if not membership:
+            raise HTTPException(status_code=403, detail="You are not a member of this company")
+            
+        requested_role = data.company_role or "worker"
+        if requested_role == "manager":
+            if membership.role not in [models.CompanyRole.admin, models.CompanyRole.manager]:
+                raise HTTPException(status_code=403, detail="Insufficient permissions for manager scope")
+            
+        access_token, refresh_token = auth.generate_user_tokens(
+            db, current_user, company_id=data.company_id, role=requested_role
+        )
+    
+    response.set_cookie(
+        key="access_token", value=access_token, httponly=True, secure=True, samesite="lax",
+        max_age=auth.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    )
+    response.set_cookie(
+        key="refresh_token", value=refresh_token, httponly=True, secure=True, samesite="lax",
+        max_age=auth.REFRESH_TOKEN_EXPIRE_DAYS * 86400
+    )
+    
+    return {"access_token": "cookie", "token_type": "bearer", "requires_2fa": False}
+
+@app.post("/admin/stop-impersonation")
+async def stop_impersonation(
+    request: Request,
+    response: Response
+):
+    """
+    SRE: Restore Admin session from backup cookies.
+    """
+    admin_access = request.cookies.get("admin_access_token")
+    admin_refresh = request.cookies.get("admin_refresh_token")
+    
+    if not admin_access or not admin_refresh:
+        # If no backup, just logout
+        response.delete_cookie("access_token")
+        response.delete_cookie("refresh_token")
+        return {"message": "Impersonation ended (no backup found)"}
+        
+    # Restore main cookies from backups
+    response.set_cookie(
+        key="access_token",
+        value=admin_access,
+        httponly=True,
+        secure=True, 
+        samesite="lax",
+        max_age=auth.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    )
+    response.set_cookie(
+        key="refresh_token",
+        value=admin_refresh,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=auth.REFRESH_TOKEN_EXPIRE_DAYS * 86400
+    )
+    
+    # Clear backups
+    response.delete_cookie("admin_access_token")
+    response.delete_cookie("admin_refresh_token")
+    
+    return {"message": "Returned to admin session"}
 
 @app.post("/admin/impersonate/{user_id}", response_model=schemas.Token)
 async def impersonate_user(
@@ -297,7 +440,7 @@ async def impersonate_user(
     """
     Impersonation: Global admin can log in as any user.
     """
-    if current_user.role != models.UserRole.admin:
+    if not getattr(current_user, "is_platform_admin", False):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only global administrators can impersonate users"
@@ -307,19 +450,61 @@ async def impersonate_user(
     if not target_user:
         raise HTTPException(status_code=404, detail="Target user not found")
     
-    # Generate Full Tokens for the target user
-    access_token, refresh_token = auth.generate_user_tokens(target_user.email)
+    # SRE: Backup current admin session before impersonating
+    current_access = request.cookies.get("access_token")
+    current_refresh = request.cookies.get("refresh_token")
     
-    # Create Session for the target user (marked as impersonated in settings if needed)
+    # Generate Hardened Tokens for the target user (ID as sub, shorter life, specific scope)
+    # We use generate_user_tokens but override with shorter expiry and scope
+    access_token, _ = auth.generate_user_tokens(db, target_user)
+    
+    # Re-decode to update scope and exp (auth.py doesn't expose it easily in generate_user_tokens)
+    payload = auth.jwt.decode(access_token, auth.PRIVATE_KEY, algorithms=[auth.ALGORITHM])
+    payload.update({
+        "scope": "impersonated",
+        "exp": datetime.utcnow() + timedelta(minutes=10)
+    })
+    access_token = auth.jwt.encode(payload, auth.PRIVATE_KEY, algorithm=auth.ALGORITHM)
+    refresh_token = auth.create_refresh_token(data={"sub": str(target_user.id)})
+    
+    # Set Backup Cookies ONLY if we are starting a primary impersonation (not nested)
+    # We detect this if there is no 'admin_refresh_token' already set.
+    if current_access and current_refresh and not request.cookies.get("admin_refresh_token"):
+        response.set_cookie(
+            key="admin_access_token",
+            value=current_access,
+            httponly=True,
+            secure=True,
+            samesite="lax",
+            max_age=auth.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+        )
+        response.set_cookie(
+            key="admin_refresh_token",
+            value=current_refresh,
+            httponly=True,
+            secure=True,
+            samesite="lax",
+            max_age=auth.REFRESH_TOKEN_EXPIRE_DAYS * 86400
+        )
+    
+    # Create Session for the target user (marked as impersonated in audit)
     auth.create_session(
         db, 
         user_id=str(target_user.id), 
         refresh_token=refresh_token,
-        device_name=f"Impersonated by Admin ({current_user.email})",
+        device_name=f"IMPERSONATED by Admin ({current_user.email})",
         ip_address=request.client.host
     )
     
-    # Set Refresh Token Cookie
+    # Set Cookies
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=600 # 10 mins
+    )
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
@@ -330,7 +515,7 @@ async def impersonate_user(
     )
 
     return {
-        "access_token": access_token, 
+        "access_token": "cookie", 
         "token_type": "bearer",
         "requires_2fa": False
     }
@@ -393,7 +578,7 @@ def read_work_logs(
     target_company_id = company_id
     
     # Permission Logic
-    if current_user.role == "admin":
+    if getattr(current_user, "is_platform_admin", False):
         # Admin can do anything
         if user_id:
             target_user_id = user_id
@@ -417,13 +602,13 @@ def read_work_logs(
                  if user_id:
                      target_user_id = user_id # Filter specific user in this company
 
-        if is_supervisor_request:
+        if is_manager_request:
              final_user_id = target_user_id
         else:
-            # Regular user or Supervisor accessing outside their scope
-            # Check generically if supervisor manages this user via any company
+            # Regular user or Manager accessing outside their scope
+            # Check generically if manager manages this user via any company
             if user_id and str(user_id) != str(current_user.id):
-                 if check_supervisor_access(db, str(current_user.id), user_id):
+                 if check_manager_access(db, current_user, user_id):
                      final_user_id = user_id
                  else:
                      raise HTTPException(status_code=403, detail="Not authorized to view other users' logs")
@@ -447,14 +632,28 @@ def delete_work_log(work_log_id: str, db: Session = Depends(get_db), current_use
     log = db.query(models.WorkLog).filter(models.WorkLog.id == work_log_id).first()
     if not log:
          raise HTTPException(status_code=404, detail="Work log not found")
-    if str(log.user_id) != str(current_user.id) and current_user.role != "admin": # Assuming role field exists
+    if str(log.user_id) != str(current_user.id) and not getattr(current_user, "is_platform_admin", False): # Assuming role field exists
          raise HTTPException(status_code=403, detail="Not authorized")
          
     crud.delete_work_log(db, work_log_id)
     return {"ok": True}
 
 @app.get("/users/me", response_model=schemas.UserResponse)
-def read_users_me(db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_verified_user)):
+def read_users_me(
+    db: Session = Depends(get_db), 
+    current_user: models.User = Depends(auth.get_verified_user),
+    token: str = Depends(auth.get_token_from_request)
+):
+    # Detect impersonation from JWT scope
+    is_impersonated = False
+    if token:
+        try:
+            payload = auth.jwt.decode(token, auth.PUBLIC_KEY, algorithms=[auth.ALGORITHM])
+            if payload.get("scope") == "impersonated":
+                is_impersonated = True
+        except:
+            pass
+
     # Self-healing for legacy user jandrobamo
     if current_user.email == "jandrobamo@gmail.com":
         membership = db.query(models.CompanyMember).filter(
@@ -475,23 +674,32 @@ def read_users_me(db: Session = Depends(get_db), current_user: models.User = Dep
                 db.commit()
                 db.refresh(current_user)
 
-    # Compute flags (is_supervisor and is_active_worker)
+    # Compute flags (is_manager and is_active_worker)
     memberships = db.query(models.CompanyMember).filter(
         models.CompanyMember.user_id == current_user.id,
         models.CompanyMember.is_active == True
     ).all()
     
-    current_user.is_supervisor = any(m.role in [models.CompanyRole.manager, models.CompanyRole.admin] for m in memberships)
+    current_user.is_manager = any(m.role in [models.CompanyRole.manager, models.CompanyRole.admin] for m in memberships)
     current_user.is_active_worker = len(memberships) > 0
 
-    return current_user
+    # Construct response with impersonated flag and active context
+    user_data = schemas.UserResponse.model_validate(current_user)
+    user_data.is_impersonated = is_impersonated
+    
+    # Attach transient context from auth logic
+    user_data.is_platform_admin = getattr(current_user, "is_platform_admin", False)
+    user_data.active_company_id = getattr(current_user, "active_company_id", None)
+    user_data.active_role = getattr(current_user, "active_role", None)
+    
+    return user_data
 
 @app.get("/users/me/companies", response_model=List[schemas.CompanyResponse])
 def read_user_companies(db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_verified_user)):
     """
     Get companies the current user is a member of.
     """
-    if current_user.role == "admin":
+    if getattr(current_user, "is_platform_admin", False):
         companies = db.query(models.Company).all()
         results = []
         for company in companies:
@@ -511,7 +719,8 @@ def read_user_companies(db: Session = Depends(get_db), current_user: models.User
 
 @app.get("/users/{user_id}", response_model=schemas.UserResponse)
 def read_user(user_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_verified_user)):
-    if current_user.role != "admin" and not check_supervisor_access(db, str(current_user.id), user_id):
+    is_platform_admin = getattr(current_user, "is_platform_admin", False)
+    if not is_platform_admin and not check_supervisor_access(db, current_user, user_id):
         raise HTTPException(status_code=403, detail="Not authorized")
     user = crud.get_user(db, user_id)
     if not user:
@@ -520,14 +729,14 @@ def read_user(user_id: str, db: Session = Depends(get_db), current_user: models.
 
 @app.get("/users", response_model=List[schemas.UserResponse])
 def read_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_verified_user)):
-    if current_user.role != "admin":
+    if not getattr(current_user, "is_platform_admin", False):
         raise HTTPException(status_code=403, detail="Not authorized")
     users = crud.get_users(db, skip=skip, limit=limit)
     return users
 
 @app.post("/users", response_model=schemas.UserResponse)
 async def create_user_admin(user: schemas.UserCreate, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_verified_user)):
-    if current_user.role != "admin":
+    if not getattr(current_user, "is_platform_admin", False):
         raise HTTPException(status_code=403, detail="Not authorized")
     db_user = crud.get_user_by_email(db, email=user.email)
     if db_user:
@@ -546,7 +755,14 @@ async def create_user_admin(user: schemas.UserCreate, db: Session = Depends(get_
     db.commit()
     
     # Send Email
-    await email_utils.send_welcome_email(user.email, temp_password)
+    if user.send_email:
+        await email_utils.send_welcome_email(user.email, temp_password)
+    
+    # Company Linkage
+    if user.company_id:
+        crud.join_company(db, str(created_user.id), str(user.company_id))
+        created_user.default_company_id = user.company_id
+        db.commit()
     
     return created_user
 
@@ -554,7 +770,7 @@ async def create_user_admin(user: schemas.UserCreate, db: Session = Depends(get_
 
 @app.put("/users/{user_id}/status")
 def toggle_user_status(user_id: str, is_active: bool, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_verified_user)):
-    if current_user.role != "admin":
+    if not getattr(current_user, "is_platform_admin", False):
         raise HTTPException(status_code=403, detail="Not authorized")
     user = crud.update_user_status(db, user_id=user_id, is_active=is_active)
     if not user:
@@ -588,11 +804,11 @@ async def reset_password_via_email(user_id: str, db: Session = Depends(get_db), 
     """
     Admin only: Reset user password to a random one and email it.
     """
-    if current_user.role != "admin":
-        # Supervisor check? maybe later. For now Admin explicitly requested.
-        # Check supervisor access
-        is_supervisor = check_supervisor_access(db, str(current_user.id), user_id)
-        if not is_supervisor:
+    if not getattr(current_user, "is_platform_admin", False):
+        # Manager check? maybe later. For now Admin explicitly requested.
+        # Check manager access
+        is_manager = check_manager_access(db, current_user, user_id)
+        if not is_manager:
              raise HTTPException(status_code=403, detail="Not authorized")
 
     user = crud.get_user(db, user_id)
@@ -634,11 +850,11 @@ def update_work_log(
     is_owner = str(log.user_id) == str(current_user.id)
     is_manager = is_manager_of_company(db, current_user, log.company_id)
     
-    if not is_owner and not is_manager and current_user.role != "admin":
+    if not is_owner and not is_manager and not getattr(current_user, "is_platform_admin", False):
          raise HTTPException(status_code=403, detail="Not authorized")
     
     # Only managers/admins can apply to group
-    if apply_to_group and not is_manager and current_user.role != "admin":
+    if apply_to_group and not is_manager and not getattr(current_user, "is_platform_admin", False):
         raise HTTPException(status_code=403, detail="Only managers can perform cascading updates")
 
     updated_log = crud.update_work_log(db, work_log_id, work_log, apply_to_group=apply_to_group)
@@ -678,7 +894,8 @@ def read_companies(skip: int = 0, limit: int = 100, db: Session = Depends(get_db
 
 @app.get("/users/{user_id}/companies", response_model=List[schemas.CompanyResponse])
 def read_user_companies_admin(user_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_verified_user)):
-    if current_user.role != "admin" and not check_supervisor_access(db, str(current_user.id), user_id):
+    is_platform_admin = getattr(current_user, "is_platform_admin", False)
+    if not is_platform_admin and not check_supervisor_access(db, current_user, user_id):
         raise HTTPException(status_code=403, detail="Not authorized")
     return crud.get_user_companies(db, user_id)
 
@@ -686,7 +903,7 @@ def read_user_companies_admin(user_id: str, db: Session = Depends(get_db), curre
 
 @app.post("/companies", response_model=schemas.CompanyResponse)
 def create_company(company: schemas.CompanyCreate, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_verified_user)):
-    if current_user.role != "admin":
+    if not getattr(current_user, "is_platform_admin", False):
         raise HTTPException(status_code=403, detail="Not authorized")
     return crud.create_company(db, company)
 
@@ -745,7 +962,7 @@ def read_companies_detailed(db: Session = Depends(get_db), current_user: models.
 
 @app.put("/users/{user_id}", response_model=schemas.UserResponse)
 def update_user(user_id: str, user: schemas.UserUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_verified_user)):
-    if current_user.role != "admin":
+    if not getattr(current_user, "is_platform_admin", False):
         raise HTTPException(status_code=403, detail="Not authorized")
     db_user = crud.update_user(db, user_id, user)
     if not db_user:
@@ -778,7 +995,7 @@ async def join_company(company_id: str, background_tasks: BackgroundTasks, db: S
     
     # Notify Admin (Hardcoded or based on role lookup - for this MVP just logging or notifying specific admin)
     # Finding company admins:
-    admins = db.query(models.User).filter(models.User.role == "admin").all()
+    admins = db.query(models.User).filter(models.User.is_platform_admin == True).all()
     for admin in admins:
          background_tasks.add_task(
             email_utils.send_notification_email,
@@ -795,7 +1012,7 @@ def read_available_companies(db: Session = Depends(get_db), current_user: models
     """
     Get companies that the user is NOT a member of.
     """
-    return crud.get_available_companies(db, str(current_user.id))
+    return crud.get_joinable_companies(db, str(current_user.id))
 
 
 
@@ -863,7 +1080,7 @@ def notify_member_status(company_id: str, user_id: str, db: Session = Depends(ge
     """
     Manually send an email notification regarding member status/role.
     """
-    if current_user.role != "admin": # And maybe Manager?
+    if not getattr(current_user, "is_platform_admin", False): # And maybe Manager?
          raise HTTPException(status_code=403, detail="Not authorized")
     
     member = crud.get_company_member(db, company_id, user_id)

@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 import models, crud, schemas
@@ -18,19 +18,45 @@ import pyotp
 from cryptography.fernet import Fernet
 import secrets
 
-# Secret key for JWT signing. 
-# WARNING: In production, this must be a strong secret loaded from environment variables.
-SECRET_KEY = os.getenv("SECRET_KEY", "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7")
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30 # Reduced for security with Refresh Tokens
+# Cryptographic Configuration
+# RS256 (Asymmetric) is used for signing and verification.
+# The private key signs the token; the public key verifies it.
+ALGORITHM = "RS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30 
 REFRESH_TOKEN_EXPIRE_DAYS = 30
+
+# Load RSA Keys
+KEYS_DIR = os.path.join(os.path.dirname(__file__), "keys")
+try:
+    with open(os.path.join(KEYS_DIR, "private_key.pem"), "r") as f:
+        PRIVATE_KEY = f.read()
+    with open(os.path.join(KEYS_DIR, "public_key.pem"), "r") as f:
+        PUBLIC_KEY = f.read()
+except FileNotFoundError:
+    # Fallback for dev/CI if keys don't exist yet (though they should be generated)
+    # In production, keys must be managed securely
+    PRIVATE_KEY = os.getenv("PRIVATE_KEY", "")
+    PUBLIC_KEY = os.getenv("PUBLIC_KEY", "")
+
+from redis_config import redis_manager
 
 # Encryption key for OTP secrets
 ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY", Fernet.generate_key().decode())
 fernet = Fernet(ENCRYPTION_KEY.encode())
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token", auto_error=False)
+
+def get_token_from_request(request: Request):
+    """
+    Extracts token from HttpOnly cookie (preferred) or Authorization header.
+    """
+    token = request.cookies.get("access_token")
+    if not token:
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split(" ")[1]
+    return token
 
 def encrypt_secret(secret: str) -> str:
     return fernet.encrypt(secret.encode()).decode()
@@ -49,51 +75,123 @@ def get_password_hash(password):
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     """Creates a JWT access token with an expiration time."""
     to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
-    to_encode.update({"exp": expire, "type": "access"})
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    now = datetime.utcnow()
+    expire = now + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    # Added jti for revocation support
+    to_encode.update({"exp": expire, "iat": now, "type": "access", "jti": secrets.token_hex(16)})
+    return jwt.encode(to_encode, PRIVATE_KEY, algorithm=ALGORITHM)
 
 def create_refresh_token(data: dict):
     """Creates a long-lived JWT refresh token."""
     to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-    to_encode.update({"exp": expire, "type": "refresh", "jti": secrets.token_hex(16)})
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    now = datetime.utcnow()
+    expire = now + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    to_encode.update({"exp": expire, "iat": now, "type": "refresh", "jti": secrets.token_hex(16)})
+    return jwt.encode(to_encode, PRIVATE_KEY, algorithm=ALGORITHM)
 
-def generate_user_tokens(user_email: str):
+def generate_user_tokens(db: Session, user: models.User, company_id: Optional[str] = None, role: Optional[str] = None, force_none: bool = False):
     """
-    Utility to generate both access and refresh tokens for a user.
-    Used during login and impersonation.
+    SRE: Enhanced token generation with platform and company context.
+    If company_id or role are not provided, it selects defaults based on user profile and memberships.
+    If force_none is True, it allows cid/role to be None (only for platform admins).
     """
-    access_token = create_access_token(data={"sub": user_email})
-    refresh_token = create_refresh_token(data={"sub": user_email})
+    is_platform_admin = user.role == models.UserRole.admin
+    
+    # SaaS Logic: Platform Admins start in neutral context by default unless a company is explicitly requested
+    if is_platform_admin and (force_none or not company_id):
+        active_cid = company_id
+        active_role = role
+    else:
+        active_cid = company_id or (str(user.default_company_id) if user.default_company_id else None)
+        active_role = role
+        
+        # Selection logic if not explicitly provided
+        if not active_cid or not active_role:
+            # Try to find membership for default or any company
+            query = db.query(models.CompanyMember).filter(
+                models.CompanyMember.user_id == user.id,
+                models.CompanyMember.is_active == True
+            )
+            
+            if active_cid:
+                membership = query.filter(models.CompanyMember.company_id == active_cid).first()
+            else:
+                membership = query.first()
+                
+            if membership:
+                active_cid = str(membership.company_id)
+                if not active_role:
+                    # admin/manager roles -> manager scope
+                    if membership.role in [models.CompanyRole.admin, models.CompanyRole.manager]:
+                        active_role = "manager"
+                    else:
+                        active_role = "worker"
+    
+    # Token Data
+    data = {
+        "sub": str(user.id),
+        "is_admin": is_platform_admin,
+        "cid": active_cid,
+        "role": active_role
+    }
+    
+    access_token = create_access_token(data=data)
+    refresh_token = create_refresh_token(data={"sub": str(user.id)})
     return access_token, refresh_token
 
-async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+async def get_current_user(token: str = Depends(get_token_from_request), db: Session = Depends(get_db)):
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication token missing",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
-        if email is None:
+        payload = jwt.decode(token, PUBLIC_KEY, algorithms=[ALGORITHM])
+        user_id: str = payload.get("sub")
+        jti: str = payload.get("jti")
+        
+        if user_id is None:
             raise credentials_exception
-        token_data = schemas.TokenData(email=email)
+            
+        # SRE Improvement: Check Blacklist in Redis
+        if jti and redis_manager.get(f"bl_{jti}"):
+            raise credentials_exception
+            
+        token_data = schemas.TokenData(
+            user_id=user_id,
+            company_id=payload.get("cid"),
+            company_role=payload.get("role"),
+            is_platform_admin=payload.get("is_admin", False),
+            scope=payload.get("scope", "full")
+        )
     except JWTError:
         raise credentials_exception
         
-    user = crud.get_user_by_email(db, email=token_data.email)
+    user = crud.get_user(db, user_id=token_data.user_id)
     if user is None:
         raise credentials_exception
     
-    # Check if this is a restricted token (2FA pending)
-    # The login endpoint will issue a token with scope="2fa_pending"
-    # Endpoints requiring full auth should use get_verified_user
+    # Attach active context to user object (transient)
+    user.active_company_id = token_data.company_id
+    user.active_role = token_data.company_role
+    user.is_platform_admin = token_data.is_platform_admin
+    user.token_scope = token_data.scope
+    
     return user
 
-async def get_verified_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+async def get_verified_user(token: str = Depends(get_token_from_request), db: Session = Depends(get_db)):
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication token missing",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     """
     Returns user only if token is fully authenticated (not 2fa_pending).
     """
@@ -109,22 +207,41 @@ async def get_verified_user(token: str = Depends(oauth2_scheme), db: Session = D
     )
 
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
+        payload = jwt.decode(token, PUBLIC_KEY, algorithms=[ALGORITHM])
+        user_id: str = payload.get("sub")
+        jti: str = payload.get("jti")
         scope: str = payload.get("scope", "")
-        print(f"DEBUG: auth check - email={email} scope={scope}")
-        if email is None:
+        
+        if user_id is None:
             raise credentials_exception
+            
+        # SRE Improvement: Check Blacklist in Redis
+        if jti and redis_manager.get(f"bl_{jti}"):
+            raise credentials_exception
+            
         if scope == "2fa_pending":
              raise two_fa_exception
              
-        token_data = schemas.TokenData(email=email)
+        token_data = schemas.TokenData(
+            user_id=user_id,
+            company_id=payload.get("cid"),
+            company_role=payload.get("role"),
+            is_platform_admin=payload.get("is_admin", False),
+            scope=payload.get("scope", "full")
+        )
     except JWTError:
         raise credentials_exception
         
-    user = crud.get_user_by_email(db, email=token_data.email)
+    user = crud.get_user(db, user_id=token_data.user_id)
     if user is None:
         raise credentials_exception
+        
+    # Attach active context to user object (transient)
+    user.active_company_id = token_data.company_id
+    user.active_role = token_data.company_role
+    user.is_platform_admin = token_data.is_platform_admin
+    user.token_scope = token_data.scope
+    
     return user
 
 # --- TOTP 2FA Logic ---
@@ -165,6 +282,22 @@ def revoke_session(db: Session, refresh_token: str):
         session.is_active = False
         db.commit()
     return session
+
+def blacklist_token(token: str):
+    """
+    Blacklists an access token in Redis until it expires.
+    """
+    try:
+        payload = jwt.decode(token, PUBLIC_KEY, algorithms=[ALGORITHM])
+        jti = payload.get("jti")
+        exp = payload.get("exp")
+        if jti and exp:
+            now = datetime.utcnow().timestamp()
+            ttl = int(exp - now)
+            if ttl > 0:
+                redis_manager.set(f"bl_{jti}", "1", ex=ttl)
+    except JWTError:
+        pass
 
 # TOTP is now the primary 2FA method. Legacy email-based 2FA logic removed.
 
