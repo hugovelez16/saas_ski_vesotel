@@ -88,7 +88,7 @@ async def send_welcome_email(email: EmailStr, password: str):
             <p style="margin: 0;"><strong>Password:</strong> <span style="font-family: monospace; font-size: 1.1em; background: #eee; padding: 2px 6px; border-radius: 3px;">{password}</span></p>
         </div>
         <p>Please change your password immediately after logging in.</p>
-            <a href="https://clasesski.vesotel.com" class="button" style="color: white;">Log In Now</a>
+            <a href="https://clases.home.com" class="button" style="color: white;">Log In Now</a>
         </div>
         """
     )

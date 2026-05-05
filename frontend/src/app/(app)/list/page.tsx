@@ -393,7 +393,6 @@ export default function ListPage() {
                     <TableCell className="capitalize py-2">{log.type}</TableCell>
                     <TableCell className="py-2">
                       <div className="flex items-center gap-2 max-w-[200px] truncate" title={log.client || ''}>
-                        {/* Assuming client might be present. In original list only client string. Supervisor has UserIcon if present. */}
                         <span className="truncate">{log.client || '-'}</span>
                       </div>
                     </TableCell>
@@ -423,16 +422,10 @@ export default function ListPage() {
                         const rate = userRates.find((r: any) => r.companyId === log.companyId);
                         if (!rate) return log.amount ? `€${Number(log.amount).toFixed(2)}` : '-';
 
-                        // Calculation logic from supervisor page adapted for client-side rendering with userRates
                         let totalGross = 0;
-                        // Note: differenceInCalendarDays is used in supervisor page, here we use simple math or need import.
-                        // Assuming simple math for now or importing differenceInCalendarDays if I can.
-                        // I will use math similar to Duration col for consistency inside this block.
-
                         if (log.type === 'tutorial' && log.startDate && log.endDate) {
                           const start = new Date(log.startDate);
                           const end = new Date(log.endDate);
-                          // Milliseconds per day
                           const msPerDay = 1000 * 60 * 60 * 24;
                           const days = Math.round((end.getTime() - start.getTime()) / msPerDay) + 1;
 
@@ -449,10 +442,8 @@ export default function ListPage() {
                             totalGross += days * Number(rate.coordinationRate || 10);
                           }
                         } else {
-                          // Particular
                           const duration = Number(log.durationHours) || 0;
                           const appliedRate = Number(log.rateApplied) || Number(rate.hourlyRate) || 0;
-
                           totalGross += duration * appliedRate;
 
                           if (log.hasNight) {
