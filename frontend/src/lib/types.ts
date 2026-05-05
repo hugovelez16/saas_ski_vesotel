@@ -17,7 +17,7 @@ export interface UserProfile {
     active_company_id?: string | null;
     active_role?: string | null;
     default_company_id?: string | null;
-    created_at: string;
+    createdAt: string;
 }
 
 export type User = UserProfile;
@@ -37,7 +37,7 @@ export interface Company {
     };
     worklogDefinitions?: Record<string, any>;
     settings?: Record<string, any>;
-    created_at: string;
+    createdAt: string;
     updatedAt: string;
 
     // UI specific
@@ -123,7 +123,7 @@ export interface WorkLog {
     client?: string | null;
     groupId?: string | null;
 
-    created_at: string;
+    createdAt: string;
     updatedAt: string;
 
     // Legacy / UI compat

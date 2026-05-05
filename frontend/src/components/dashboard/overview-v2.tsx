@@ -12,13 +12,14 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, AreaChart, Area, XAx
 interface OverviewV3Props {
     workLogs: WorkLog[];
     companies: Company[];
+    activeCompanyId?: string | null;
     onAddRecord: () => void;
     onNavigate: (tab: string) => void;
     selectedDate: Date;
     onViewLog?: (log: WorkLog) => void;
 }
 
-export function OverviewV3({ workLogs, companies, onAddRecord, onNavigate, selectedDate, onViewLog }: OverviewV3Props) {
+export function OverviewV3({ workLogs, companies, activeCompanyId, onAddRecord, onNavigate, selectedDate, onViewLog }: OverviewV3Props) {
     const currentMonthName = format(new Date(), 'MMMM');
 
     const stats = useMemo(() => {
@@ -32,18 +33,18 @@ export function OverviewV3({ workLogs, companies, onAddRecord, onNavigate, selec
 
         // Filter logs
         const currentMonthLogs = workLogs.filter(log => {
-            const d = new Date(log.date || log.startDate || log.created_at);
+            const d = parseISO(log.startDate || log.createdAt);
             return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
         });
 
         const lastMonthLogs = workLogs.filter(log => {
-            const d = new Date(log.date || log.startDate || log.created_at);
+            const d = parseISO(log.startDate || log.createdAt);
             return d.getMonth() === lastMonth && d.getFullYear() === lastMonthYear;
         });
         
         console.log("Registros del mes actual:", currentMonthLogs);
-        const income = currentMonthLogs.reduce((acc, log) => acc + (Number(log.amount) || 0), 0);
-        const lastIncome = lastMonthLogs.reduce((acc, log) => acc + (Number(log.amount) || 0), 0);
+        const income = currentMonthLogs.reduce((acc, log) => acc + (Number(log.netAmount || log.grossAmount) || 0), 0);
+        const lastIncome = lastMonthLogs.reduce((acc, log) => acc + (Number(log.netAmount || log.grossAmount) || 0), 0);
 
         // Detailed Calc
         let particularHours = 0;
@@ -72,7 +73,7 @@ export function OverviewV3({ workLogs, companies, onAddRecord, onNavigate, selec
                     // Fallback for bad dates
                 }
             } else if (log.type === 'particular' && logDate) {
-                particularDates.add(format(new Date(logDate), 'yyyy-MM-dd'));
+                particularDates.add(format(parseISO(logDate), 'yyyy-MM-dd'));
             }
         });
 
@@ -129,6 +130,24 @@ export function OverviewV3({ workLogs, companies, onAddRecord, onNavigate, selec
         };
     }, [workLogs, companies, selectedDate]);
 
+    // SaaS Dynamic Columns Logic
+    const activeCompany = useMemo(() => {
+        if (!activeCompanyId) return null;
+        return companies.find(c => c.id === activeCompanyId);
+    }, [companies, activeCompanyId]);
+
+    const dynamicFields = useMemo(() => {
+        if (!activeCompany?.worklogDefinitions) return [];
+        const fields = new Set<string>();
+        Object.values(activeCompany.worklogDefinitions).forEach((def: any) => {
+            if (def.fields && Array.isArray(def.fields)) {
+                def.fields.forEach((f: string) => fields.add(f));
+            }
+        });
+        // We exclude 'description' as it's usually standard or handled separately
+        return Array.from(fields).filter((f: string) => f !== 'description');
+    }, [activeCompany]);
+
     // 3. Chart Data (Aligned with Analytics: Last 6 Months)
     const chartData = useMemo(() => {
         const end = selectedDate;
@@ -141,10 +160,10 @@ export function OverviewV3({ workLogs, companies, onAddRecord, onNavigate, selec
 
             const income = workLogs
                 .filter(log => {
-                    const d = new Date(log.date || log.startDate || log.created_at);
+                    const d = parseISO(log.startDate || log.createdAt);
                     return d >= monthStart && d <= monthEnd;
                 })
-                .reduce((acc, log) => acc + (Number(log.amount) || 0), 0);
+                .reduce((acc, log) => acc + (Number(log.netAmount || log.grossAmount) || 0), 0);
 
             return {
                 name: format(month, 'MMM'), // Short Name for XAxis
@@ -155,8 +174,8 @@ export function OverviewV3({ workLogs, companies, onAddRecord, onNavigate, selec
     }, [workLogs, selectedDate]);
 
     const recentLogs = [...workLogs].sort((a, b) => {
-        const dateA = new Date(a.date || a.startDate || a.created_at);
-        const dateB = new Date(b.date || b.startDate || b.created_at);
+        const dateA = parseISO(a.startDate || a.createdAt);
+        const dateB = parseISO(b.startDate || b.createdAt);
         return dateB.getTime() - dateA.getTime();
     }).slice(0, 5);
 
@@ -348,6 +367,9 @@ export function OverviewV3({ workLogs, companies, onAddRecord, onNavigate, selec
                                         <TableHead className="text-slate-50 rounded-tl-md whitespace-nowrap">Date</TableHead>
                                         <TableHead className="text-slate-50 min-w-[100px]">Type</TableHead>
                                         <TableHead className="text-slate-50 min-w-[120px]">Client</TableHead>
+                                        {dynamicFields.map(field => (
+                                            <TableHead key={field} className="text-slate-50 capitalize hidden lg:table-cell">{field}</TableHead>
+                                        ))}
                                         <TableHead className="text-slate-50 hidden md:table-cell">Flags</TableHead>
                                         <TableHead className="text-slate-50 rounded-tr-md">Amount</TableHead>
                                     </TableRow>
@@ -355,7 +377,7 @@ export function OverviewV3({ workLogs, companies, onAddRecord, onNavigate, selec
                                 <TableBody>
                                     {recentLogs.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={5} className="text-center py-4 text-muted-foreground">
+                                            <TableCell colSpan={5 + dynamicFields.length} className="text-center py-4 text-muted-foreground">
                                                 No recent activity.
                                             </TableCell>
                                         </TableRow>
@@ -370,9 +392,9 @@ export function OverviewV3({ workLogs, companies, onAddRecord, onNavigate, selec
                                                     <div className="flex items-center gap-2">
                                                         <span className="font-medium whitespace-nowrap">
                                                             {log.type === 'tutorial' && log.startDate && log.endDate
-                                                                ? `${format(new Date(log.startDate), "dd/MM/yyyy")} - ${format(new Date(log.endDate), "dd/MM/yyyy")}`
-                                                                : log.date
-                                                                    ? format(new Date(log.date), "dd/MM/yyyy")
+                                                                ? `${format(parseISO(log.startDate), "dd/MM/yyyy")} - ${format(parseISO(log.endDate), "dd/MM/yyyy")}`
+                                                                : log.startDate
+                                                                    ? format(parseISO(log.startDate), "dd/MM/yyyy")
                                                                     : "-"}
                                                         </span>
                                                         {log.type === 'particular' && log.startTime && log.endTime && (
@@ -389,6 +411,11 @@ export function OverviewV3({ workLogs, companies, onAddRecord, onNavigate, selec
                                                         <span className="truncate block">{log.client || '-'}</span>
                                                     </div>
                                                 </TableCell>
+                                                {dynamicFields.map(field => (
+                                                    <TableCell key={field} className="py-2 hidden lg:table-cell truncate max-w-[100px]" title={log.extraData?.datos?.[field] || '-'}>
+                                                        {log.extraData?.datos?.[field] || '-'}
+                                                    </TableCell>
+                                                ))}
                                                 <TableCell className="py-2 hidden md:table-cell">
                                                     <div className="flex gap-1">
                                                         {log.hasCoordination && (
@@ -403,7 +430,7 @@ export function OverviewV3({ workLogs, companies, onAddRecord, onNavigate, selec
                                                         )}
                                                     </div>
                                                 </TableCell>
-                                                <TableCell className="py-2 font-medium">{log.amount ? `€${Number(log.amount).toFixed(2)}` : '-'}</TableCell>
+                                                <TableCell className="py-2 font-medium">{(log.netAmount || log.grossAmount) ? `€${Number(log.netAmount || log.grossAmount).toFixed(2)}` : '-'}</TableCell>
                                             </TableRow>
                                         ))
                                     )}

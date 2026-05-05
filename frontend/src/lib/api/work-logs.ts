@@ -26,8 +26,8 @@ export const createWorkLog = async (data: WorkLogCreate): Promise<WorkLog> => {
     return response.data;
 };
 
-export const updateWorkLog = async (id: string, data: Partial<WorkLogCreate>): Promise<WorkLog> => {
-    const response = await api.put(`/work-logs/${id}`, data);
+export const updateWorkLog = async (id: string, data: Partial<WorkLogCreate>, applyToGroup: boolean = false): Promise<WorkLog> => {
+    const response = await api.put(`/work-logs/${id}?apply_to_group=${applyToGroup}`, data);
     return response.data;
 };
 

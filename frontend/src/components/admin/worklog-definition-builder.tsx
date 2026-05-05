@@ -8,6 +8,13 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Trash2, Plus, Save } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 interface WorklogDefinitionBuilderProps {
     initialValue: Record<string, any>;
     onSave: (value: Record<string, any>) => void;
@@ -118,15 +125,35 @@ export function WorklogDefinitionBuilder({ initialValue, onSave }: WorklogDefini
                     </CardHeader>
 
                     <CardContent className="space-y-6 pt-0">
-                        <div className="flex items-center space-x-2 bg-slate-100 dark:bg-slate-800 p-2 rounded-md">
-                            <Switch
-                                id={`range-${index}`}
-                                checked={typeObj.data.is_range === true}
-                                onCheckedChange={(c) => handleDataChange(index, 'is_range', c)}
-                            />
-                            <Label htmlFor={`range-${index}`} className="cursor-pointer">
-                                Es un evento de varios días (Pide Rango de Fechas en lugar de Horas)
-                            </Label>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-100 dark:bg-slate-800 p-3 rounded-md">
+                            <div className="space-y-2">
+                                <Label className="text-sm font-semibold">Modo de Cálculo / Unidad</Label>
+                                <Select 
+                                    value={typeObj.data.unit || (typeObj.data.is_range ? "days" : "hours")} 
+                                    onValueChange={(val) => {
+                                        handleDataChange(index, 'unit', val);
+                                        handleDataChange(index, 'is_range', val === "days");
+                                    }}
+                                >
+                                    <SelectTrigger className="h-9 bg-white dark:bg-slate-950">
+                                        <SelectValue placeholder="Seleccionar modo" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="hours">Por Horas (Requiere Hora Inicio/Fin)</SelectItem>
+                                        <SelectItem value="days">Por Días (Requiere Rango de Fechas)</SelectItem>
+                                        <SelectItem value="fixed">Precio Fijo (Solo Fecha, sin horas)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="flex flex-col justify-end">
+                                <p className="text-[11px] text-muted-foreground pb-1">
+                                    {typeObj.data.unit === 'fixed' 
+                                        ? 'El trabajador solo elige el día. Se cobra la tarifa base directamente.' 
+                                        : typeObj.data.is_range 
+                                            ? 'Ideal para cursillos o viajes de varios días.' 
+                                            : 'Ideal para clases particulares o turnos sueltos.'}
+                                </p>
+                            </div>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

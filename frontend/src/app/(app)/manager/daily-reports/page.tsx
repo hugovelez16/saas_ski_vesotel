@@ -30,6 +30,7 @@ export default function ManagerDailyReportPage() {
     const [date, setDate] = useState<Date>(new Date());
     const [selectedLog, setSelectedLog] = useState<any>(null);
     const [selectedCompanyId, setSelectedCompanyId] = useState<string>(initialCompanyId || "");
+    const [applyToGroup, setApplyToGroup] = useState(false);
 
     // Sync state with URL if it changes (e.g. sidebar navigation)
     useEffect(() => {
@@ -368,6 +369,11 @@ export default function ManagerDailyReportPage() {
                 open={!!selectedLog}
                 onOpenChange={(open) => !open && setSelectedLog(null)}
                 userSettings={null}
+                onEdit={(log, group) => {
+                    setApplyToGroup(group);
+                    setSelectedLog(null);
+                    // TODO: Implement Edit Dialog here if needed
+                }}
             />
 
             {/* Create Dialog */}

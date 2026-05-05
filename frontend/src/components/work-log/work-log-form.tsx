@@ -62,26 +62,37 @@ export function WorkLogForm({ formData, setFormData, logType, setLogType, compan
     useEffect(() => {
         if (companies.length > 0 && !formData.companyId) {
             let defaultId = "";
-            if (default_company_id) {
+            
+            // Priority: Active Context > User Default > Personal > First Available
+            if (user?.active_company_id) {
+                const found = companies.find(c => c.id === user.active_company_id);
+                if (found) defaultId = found.id;
+            }
+            
+            if (!defaultId && default_company_id) {
                 const found = companies.find(c => c.id === default_company_id);
                 if (found) defaultId = found.id;
             }
+            
             if (!defaultId && user?.default_company_id) {
                 const found = companies.find(c => c.id === user.default_company_id);
                 if (found) defaultId = found.id;
             }
+            
             if (!defaultId) {
                 const personal = companies.find(c => c.name === "Personal");
                 if (personal) defaultId = personal.id;
             }
+            
             if (!defaultId) {
                 defaultId = companies[0].id;
             }
+            
             if (defaultId) {
                 setFormData(prev => ({ ...prev, companyId: defaultId }));
             }
         }
-    }, [companies, formData.companyId, user?.default_company_id, default_company_id, setFormData]);
+    }, [companies, formData.companyId, user?.active_company_id, user?.default_company_id, default_company_id, setFormData]);
 
     // Ensure valid logType when company changes or mounts
     useEffect(() => {
@@ -93,8 +104,15 @@ export function WorkLogForm({ formData, setFormData, logType, setLogType, compan
 
     // Reset extra boolean fields when type changes so we don't bleed options between shift types
     useEffect(() => {
-        setFormData(prev => ({ ...prev, arrivesPrior: false, hasNight: false, hasCoordination: false }));
-    }, [logType, setFormData]);
+        setFormData(prev => {
+            const next = { ...prev, arrivesPrior: false, hasNight: false, hasCoordination: false };
+            if (currentDefinition?.unit === 'fixed') {
+                next.startTime = null;
+                next.endTime = null;
+            }
+            return next;
+        });
+    }, [logType, setFormData, currentDefinition]);
 
     const handleCompanyChange = (value: string) => {
         setFormData(prev => ({ ...prev, companyId: value }));
@@ -134,24 +152,27 @@ export function WorkLogForm({ formData, setFormData, logType, setLogType, compan
     };
 
     const isRange = currentDefinition?.is_range === true; // If JSON denotes it's a date range, e.g. tutorial
+    const isFixed = currentDefinition?.unit === "fixed";
 
     return (
         <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-2 sm:gap-4">
-                <Label className="text-left sm:text-right">Empresa</Label>
-                <Select value={formData.companyId} onValueChange={handleCompanyChange}>
-                    <SelectTrigger className="w-full sm:col-span-3">
-                        <SelectValue placeholder="Selecciona una empresa" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {companies.filter(c => c.id).map((c) => (
-                            <SelectItem key={c.id} value={c.id}>
-                                {c.name}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </div>
+            {(!user?.active_company_id || user?.is_platform_admin) && (
+                <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-2 sm:gap-4">
+                    <Label className="text-left sm:text-right">Empresa</Label>
+                    <Select value={formData.companyId} onValueChange={handleCompanyChange}>
+                        <SelectTrigger className="w-full sm:col-span-3">
+                            <SelectValue placeholder="Selecciona una empresa" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {companies.filter(c => c.id).map((c) => (
+                                <SelectItem key={c.id} value={c.id}>
+                                    {c.name}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+            )}
 
             {Object.keys(worklogDefinitions).length > 0 && (
                 <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-2 sm:gap-4">
@@ -189,14 +210,18 @@ export function WorkLogForm({ formData, setFormData, logType, setLogType, compan
                             </PopoverContent>
                         </Popover>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-2 sm:gap-4">
-                        <Label htmlFor="startTime" className="text-left sm:text-right">Hora Inicio</Label>
-                        <Input id="startTime" name="startTime" type="time" className="w-full sm:col-span-3" value={formData.startTime || ''} onChange={handleInputChange} />
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-2 sm:gap-4">
-                        <Label htmlFor="endTime" className="text-left sm:text-right">Hora Fin</Label>
-                        <Input id="endTime" name="endTime" type="time" className="w-full sm:col-span-3" value={formData.endTime || ''} onChange={handleInputChange} />
-                    </div>
+                    {!isFixed && (
+                        <>
+                            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-2 sm:gap-4">
+                                <Label htmlFor="startTime" className="text-left sm:text-right">Hora Inicio</Label>
+                                <Input id="startTime" name="startTime" type="time" className="w-full sm:col-span-3" value={formData.startTime || ''} onChange={handleInputChange} />
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-2 sm:gap-4">
+                                <Label htmlFor="endTime" className="text-left sm:text-right">Hora Fin</Label>
+                                <Input id="endTime" name="endTime" type="time" className="w-full sm:col-span-3" value={formData.endTime || ''} onChange={handleInputChange} />
+                            </div>
+                        </>
+                    )}
                 </>
             ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-2 sm:gap-4">

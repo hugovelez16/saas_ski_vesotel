@@ -64,10 +64,25 @@ export function CompanySwitcher({ companies }: CompanySwitcherProps) {
             value={selectedCompany?.id || (pathname === '/manager/dashboard' && !currentCompanyId ? "overview" : "")}
             onValueChange={onSelectCompany}
         >
-            <SelectTrigger className="w-full bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700 focus:ring-0 focus:ring-offset-0">
-                <div className="flex items-center truncate">
+            <SelectTrigger className="w-full h-auto py-2 bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700 focus:ring-0 focus:ring-offset-0">
+                <div className="flex items-center w-full overflow-hidden">
                     <Building2 className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                    <SelectValue placeholder="Select company..." />
+                    <div className="flex flex-col items-start truncate">
+                        {selectedCompany ? (
+                            <>
+                                <span className="text-sm font-semibold truncate leading-none mb-1">
+                                    {selectedCompany.name}
+                                </span>
+                                {selectedCompany.role && (
+                                    <span className="text-[10px] uppercase tracking-wider opacity-60 leading-none">
+                                        {selectedCompany.role}
+                                    </span>
+                                )}
+                            </>
+                        ) : (
+                            <span className="text-sm">Overview</span>
+                        )}
+                    </div>
                 </div>
             </SelectTrigger>
             <SelectContent className="bg-slate-900 border-slate-700 text-slate-200">
@@ -75,7 +90,14 @@ export function CompanySwitcher({ companies }: CompanySwitcherProps) {
                     <SelectLabel className="text-slate-500">My Companies</SelectLabel>
                     {companies.map((company) => (
                         <SelectItem key={company.id} value={company.id} className="focus:bg-slate-800 focus:text-white cursor-pointer">
-                            {company.name}
+                            <div className="flex flex-col items-start py-0.5">
+                                <span className="text-sm font-medium">{company.name}</span>
+                                {company.role && (
+                                    <span className="text-[10px] uppercase tracking-wider opacity-50">
+                                        {company.role}
+                                    </span>
+                                )}
+                            </div>
                         </SelectItem>
                     ))}
                 </SelectGroup>

@@ -64,6 +64,15 @@ export function Sidebar({ navGroups }: { navGroups: NavGroup[] }) {
     const [mobileOpen, setMobileOpen] = useState(false);
     const [isScopeDialogOpen, setIsScopeDialogOpen] = useState(false);
 
+    // Fetch companies to show active company name
+    const { data: companies = [] } = useQuery({
+        queryKey: ["myCompanies"],
+        queryFn: getMyCompanies,
+        enabled: !!user,
+    });
+
+    const activeCompany = companies.find(c => c.id === user?.active_company_id);
+
     // State to track expanded groups. key = group index
     // Default open all
     const [openGroups, setOpenGroups] = useState<Record<number, boolean>>({});
@@ -216,9 +225,10 @@ export function Sidebar({ navGroups }: { navGroups: NavGroup[] }) {
                                     className="flex items-center space-x-3 text-indigo-400 w-full px-3 py-2 hover:bg-white/5 rounded-md transition-colors mb-2"
                                 >
                                     <Building2 size={20} />
-                                    <div className="flex flex-col items-start translate-y-[1px]">
+                                    <div className="flex flex-col items-start translate-y-[1px] min-w-0 flex-1">
                                         <span className="text-sm font-medium">Cambiar Contexto</span>
-                                        <span className="text-[10px] opacity-70 uppercase tracking-tighter">
+                                        <span className="text-[10px] opacity-70 uppercase tracking-tighter truncate w-full text-left">
+                                            {activeCompany ? `${activeCompany.name} • ` : ''}
                                             {!user?.active_role ? 'Administrador' : (user.active_role === 'manager' ? 'Manager' : 'Trabajador')}
                                         </span>
                                     </div>
@@ -321,9 +331,10 @@ export function Sidebar({ navGroups }: { navGroups: NavGroup[] }) {
                     >
                         <Building2 size={20} className="flex-shrink-0" />
                         {expanded && (
-                            <div className="flex flex-col items-start min-w-0">
+                            <div className="flex flex-col items-start min-w-0 flex-1">
                                 <span className="text-sm font-medium">Cambiar Contexto</span>
-                                <span className="text-[10px] opacity-50 uppercase font-bold tracking-tighter">
+                                <span className="text-[10px] opacity-50 uppercase font-bold tracking-tighter truncate w-full text-left">
+                                    {activeCompany ? `${activeCompany.name} • ` : ''}
                                     {!user?.active_role ? 'Administrador' : (user.active_role === 'manager' ? 'Manager' : 'Trabajador')}
                                 </span>
                             </div>

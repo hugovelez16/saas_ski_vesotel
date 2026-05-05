@@ -13,204 +13,211 @@ import {
 import { Button } from "@/components/ui/button";
 import { format, parseISO, differenceInCalendarDays } from "date-fns";
 import { es } from "date-fns/locale";
-import { WorkLog, UserSettings } from "@/lib/types";
-import { formatCurrency } from "@/lib/utils";
+import { WorkLog, UserSettings, Company } from "@/lib/types";
+import { formatCurrency, cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/context/AuthContext";
+import { useQuery } from "@tanstack/react-query";
+import { getMyCompanies } from "@/lib/api/companies";
+import { Badge } from "@/components/ui/badge";
 
 interface WorkLogDetailsDialogProps {
     log: WorkLog | null;
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    companies?: Company[] | null;
     userSettings?: UserSettings | null;
-    onEdit?: (log: WorkLog) => void;
+    onEdit?: (log: WorkLog, applyToGroup: boolean) => void;
     onDelete?: (log: WorkLog) => void;
 }
 
-export function WorkLogDetailsDialog({ log, open, onOpenChange, userSettings, onEdit, onDelete }: WorkLogDetailsDialogProps) {
+export function WorkLogDetailsDialog({ log, open, onOpenChange, companies: initialCompanies, userSettings, onEdit, onDelete }: WorkLogDetailsDialogProps) {
     const { user } = useAuth();
     const [applyToGroup, setApplyToGroup] = React.useState(false);
 
+    // Fetch companies if not provided (cached by React Query)
+    const { data: myCompanies = [] } = useQuery({
+        queryKey: ["myCompanies"],
+        queryFn: getMyCompanies,
+        enabled: open && !initialCompanies,
+    });
+
+    const companies = initialCompanies || myCompanies;
+
     if (!log) return null;
 
-    const isTutorial = log.type === 'tutorial';
+    // Resolve Definition
+    const company = companies?.find(c => c.id === log.companyId);
+    const definition = company?.worklogDefinitions?.[log.type];
+    const typeLabel = definition?.label || log.type;
 
-    // Breakdown Calculation Logic
-    let breakdown = [];
-    let calculatedGross = 0;
+    // Logic for Date/Time display
+    const isRange = definition?.unit === 'days' || (log.type === 'tutorial' && log.endDate);
+    const isFixed = definition?.unit === 'fixed';
 
-    if (isTutorial && log.startDate && log.endDate) {
-        const start = parseISO(log.startDate);
-        const end = parseISO(log.endDate);
-        const days = differenceInCalendarDays(end, start) + 1;
-        const rate = log.rateApplied || userSettings?.dailyRate || 0;
-        const baseTotal = days * rate;
+    // Calculation Snapshot Breakdown
+    const snapshot = log.calculationSnapshot;
+    const displayLines = snapshot?.display_lines || [];
 
-        breakdown.push({ label: `${days}d x ${rate.toFixed(2)}€ (Tutorial)`, value: baseTotal });
-        calculatedGross += baseTotal;
-
-        if (log.hasNight) {
-            let nightBase = days > 0 ? days - 1 : 0;
-            const nights = log.arrivesPrior ? nightBase + 1 : nightBase;
-            const nightRate = userSettings?.nightRate ?? 30;
-            const nightTotal = nights * nightRate;
-
-            breakdown.push({ label: `${nights} nights (noches) x ${formatCurrency(nightRate)} / night (noche)`, value: nightTotal });
-            calculatedGross += nightTotal;
-        }
-
-        if (log.hasCoordination) {
-            const coordinationRate = userSettings?.coordinationRate ?? 10;
-            const coordinationTotal = days * coordinationRate;
-            breakdown.push({ label: `${days} days (días) x ${formatCurrency(coordinationRate)} (Coordination/Coordinación)`, value: coordinationTotal });
-            calculatedGross += coordinationTotal;
-        }
-
-    } else if (!isTutorial && log.date) {
-        const duration = log.durationHours || 0;
-        const rate = log.rateApplied || userSettings?.hourlyRate || 0;
-        const baseTotal = duration * rate;
-
-        breakdown.push({ label: `${duration.toFixed(2)}h x ${rate.toFixed(2)}€`, value: baseTotal });
-        calculatedGross += baseTotal;
-
-        if (log.hasNight) {
-            const nightRate = userSettings?.nightRate ?? 30;
-            breakdown.push({ label: `Night Supplement (Plus nocturnidad)`, value: nightRate });
-            calculatedGross += nightRate;
-        }
-
-        if (log.hasCoordination) {
-            const coordinationRate = userSettings?.coordinationRate ?? 10;
-            breakdown.push({ label: `Coordination Supplement (Plus coordinación)`, value: coordinationRate });
-            calculatedGross += coordinationRate;
-        }
-    }
-
-    // Use stored totals as source of truth
-    const finalGross = log.grossAmount || calculatedGross;
-    const finalNet = log.amount || finalGross;
-
-    // Add adjustment if there's a difference between calculated and stored gross
-    const adjustment = finalGross - calculatedGross;
-    if (Math.abs(adjustment) > 0.01) {
-        breakdown.push({
-            label: `Adjustment (Ajuste manual / histórico)`,
-            value: adjustment
-        });
-    }
+    // Fallback breakdown for legacy logs
+    const hasSnapshot = !!snapshot && displayLines.length > 0;
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[600px]">
+            <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle>Work Log Details</DialogTitle>
+                    <DialogTitle className="flex items-center gap-2">
+                        <span>Detalles del Parte</span>
+                        <Badge variant="secondary" className="capitalize">{typeLabel}</Badge>
+                    </DialogTitle>
                     <DialogDescription>
-                        Full breakdown of the price calculation.
+                        Información completa y desglose de cálculo.
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="grid gap-4 py-4 text-sm">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid gap-6 py-4 text-sm">
+                    {/* Basic Info Section */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-lg border">
                         <div>
-                            <h4 className="font-semibold text-muted-foreground">Type</h4>
-                            <p className="capitalize">{log.type}</p>
+                            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Empresa</h4>
+                            <p className="font-medium">{company?.name || 'Cargando...'}</p>
                         </div>
                         <div>
-                            <h4 className="font-semibold text-muted-foreground">Client</h4>
-                            <p>{log.client || '-'}</p>
-                        </div>
-                        <div>
-                            <h4 className="font-semibold text-muted-foreground">Date</h4>
-                            {isTutorial ? (
-                                <p>{log.startDate ? format(parseISO(log.startDate), 'dd/MM/yyyy') : '-'} - {log.endDate ? format(parseISO(log.endDate), 'dd/MM/yy') : '-'}</p>
+                            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Fecha</h4>
+                            {isRange ? (
+                                <p className="font-medium">
+                                    {log.startDate ? format(parseISO(log.startDate), 'dd/MM/yyyy') : '-'} - {log.endDate ? format(parseISO(log.endDate), 'dd/MM/yyyy') : '-'}
+                                </p>
                             ) : (
-                                <p>{log.date ? format(parseISO(log.date), 'dd/MM/yyyy') : '-'}</p>
+                                <p className="font-medium">{log.startDate ? format(parseISO(log.startDate), 'dd/MM/yyyy') : '-'}</p>
                             )}
                         </div>
                         <div>
-                            <h4 className="font-semibold text-muted-foreground">Time</h4>
-                            {isTutorial ? (
-                                <p>{log.startDate && log.endDate ? differenceInCalendarDays(parseISO(log.endDate), parseISO(log.startDate)) + 1 : 0} days</p>
+                            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Tiempo / Unidad</h4>
+                            {isRange ? (
+                                <p className="font-medium">
+                                    {log.startDate && log.endDate ? differenceInCalendarDays(parseISO(log.endDate), parseISO(log.startDate)) + 1 : 0} días
+                                </p>
+                            ) : isFixed ? (
+                                <p className="font-medium">Precio Fijo / Jornada</p>
                             ) : (
-                                <p>{log.startTime} - {log.endTime} ({log.durationHours?.toFixed(2)}h)</p>
+                                <p className="font-medium">{log.startTime} - {log.endTime} ({log.durationHours?.toFixed(2)}h)</p>
                             )}
                         </div>
                     </div>
 
-                    <div className="border-t pt-4 bg-slate-50 p-4 rounded-md">
-                        <h4 className="font-semibold mb-2">Price Breakdown</h4>
-                        <div className="space-y-2">
-                            {breakdown.map((item, index) => (
-                                <div key={index} className="flex justify-between">
-                                    <span className={item.label.includes('Adjustment') ? 'italic text-muted-foreground' : ''}>{item.label}</span>
-                                    <span>{formatCurrency(item.value)}</span>
-                                </div>
-                            ))}
-
-                            <div className="border-t border-slate-300 my-2"></div>
-
-                            <div className="flex justify-between font-bold">
-                                <span>Total Gross (Bruto)</span>
-                                <span>{formatCurrency(finalGross)}</span>
-                            </div>
-
-                            {/* Show deductions if calculated or stored */}
-                            {log.isGrossCalculation && (
-                                <>
-                                    {/* Estimated Deductions if we don't have stored percentages (just for info) */}
-                                    <div className="flex justify-between text-red-500 text-xs mt-1">
-                                        <span>Retenciones y deducciones</span>
-                                        <span>-{formatCurrency(finalGross - finalNet)}</span>
+                    {/* Dynamic Fields Section (extraData) */}
+                    {definition?.fields && definition.fields.length > 0 && (
+                        <div className="space-y-3">
+                            <h4 className="font-bold border-b pb-1 flex items-center gap-2">
+                                Datos del Servicio
+                            </h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
+                                {definition.fields.map((field: string) => (
+                                    <div key={field}>
+                                        <h5 className="text-xs font-medium text-muted-foreground capitalize">{field}</h5>
+                                        <p>{log.extraData?.datos?.[field] || '-'}</p>
                                     </div>
-                                </>
-                            )}
-
-                            <div className="flex justify-between text-green-600 font-bold border-t border-slate-200 mt-2 pt-2 text-base">
-                                <span>Total Net (Neto)</span>
-                                <span>{formatCurrency(finalNet)}</span>
+                                ))}
+                                {log.description && (
+                                    <div className="sm:col-span-2">
+                                        <h5 className="text-xs font-medium text-muted-foreground">Descripción</h5>
+                                        <p className="italic">{log.description}</p>
+                                    </div>
+                                )}
                             </div>
+                        </div>
+                    )}
+
+                    {/* Price Breakdown Section (The "Ticket") */}
+                    <div className="border rounded-lg overflow-hidden shadow-sm">
+                        <div className="bg-slate-900 text-white px-4 py-2 flex justify-between items-center">
+                            <h4 className="font-semibold text-xs uppercase tracking-widest">Desglose de Pago</h4>
+                            <span className="text-[10px] opacity-70">Snapshot v{snapshot?.version || 'Legacy'}</span>
+                        </div>
+                        <div className="p-4 space-y-2 bg-white dark:bg-slate-950">
+                            {hasSnapshot ? (
+                                <>
+                                    {displayLines.map((line: any, index: number) => {
+                                        const isSubtotal = line.type === 'subtotal';
+                                        const isTotal = line.type === 'total';
+                                        const isTax = line.type === 'tax';
+                                        
+                                        return (
+                                            <React.Fragment key={index}>
+                                                {isSubtotal && <div className="h-px bg-slate-200 my-2" />}
+                                                {isTotal && <div className="h-[2px] bg-slate-200 my-2" />}
+                                                <div className={`flex justify-between items-center ${isTotal ? 'text-lg font-bold text-green-600' : isSubtotal ? 'font-bold' : ''}`}>
+                                                    <span className={cn(
+                                                        "text-sm",
+                                                        isTax && "text-red-500 text-xs italic pl-2",
+                                                        isSubtotal && "text-slate-700"
+                                                    )}>
+                                                        {line.label}
+                                                    </span>
+                                                    <span className={cn(
+                                                        "font-mono",
+                                                        isTax && "text-red-500 text-xs",
+                                                        isTotal && "text-green-600"
+                                                    )}>
+                                                        {formatCurrency(line.value)}
+                                                    </span>
+                                                </div>
+                                            </React.Fragment>
+                                        );
+                                    })}
+                                </>
+                            ) : (
+                                <div className="text-center py-4 text-muted-foreground italic text-xs">
+                                    No hay snapshot de cálculo disponible para este registro histórico.
+                                    <div className="mt-2 text-sm not-italic font-bold text-foreground flex justify-between">
+                                        <span>Total Cobrado:</span>
+                                        <span>{formatCurrency(log.netAmount || log.amount || 0)}</span>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
 
-                    <div className="text-xs text-muted-foreground mt-2">
-                        Log ID: {log.id} {log.groupId && `| Group ID: ${log.groupId}`}
+                    {/* ID and Metadata */}
+                    <div className="flex justify-between items-center text-[10px] text-muted-foreground pt-2 border-t border-dashed">
+                        <span>Log ID: {log.id}</span>
+                        {log.groupId && <span>Group ID: {log.groupId}</span>}
                     </div>
 
-                    {log.groupId && (
-                        <div className="flex items-center space-x-2 mt-4 p-2 bg-blue-50 rounded-md border border-blue-100">
+                    {/* Group Action Checkbox - Only for Managers/Admins */}
+                    {log.groupId && (user?.is_platform_admin || company?.role === 'manager' || company?.role === 'admin' || user?.active_role === 'manager') && (
+                        <div className="flex items-center space-x-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-100 dark:border-blue-800 transition-colors hover:bg-blue-100 dark:hover:bg-blue-900/30">
                             <Checkbox 
                                 id="applyToGroup" 
                                 checked={applyToGroup} 
                                 onCheckedChange={(checked) => setApplyToGroup(!!checked)}
                             />
-                            <Label htmlFor="applyToGroup" className="text-sm font-medium text-blue-900 cursor-pointer">
-                                Aplicar cambios de edición a todo el grupo
+                            <Label htmlFor="applyToGroup" className="text-xs font-medium text-blue-900 dark:text-blue-300 cursor-pointer select-none">
+                                Aplicar cambios de edición a todo el grupo de trabajadores
                             </Label>
                         </div>
                     )}
                 </div>
 
-                <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
+                <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0 border-t pt-4">
                     <div className="flex gap-2 w-full sm:w-auto mr-auto">
                         {onEdit && (
                             <Button variant="secondary" onClick={() => {
-                                // We might need to pass applyToGroup to the edit handler
-                                // If onEdit opens another dialog, that dialog needs to know.
-                                (onEdit as any)(log, applyToGroup);
+                                onEdit(log, applyToGroup);
                             }}>
-                                Edit
+                                Editar
                             </Button>
                         )}
                         {onDelete && (
                             <Button variant="destructive" onClick={() => onDelete(log)}>
-                                Delete
+                                Eliminar
                             </Button>
                         )}
                     </div>
                     <DialogClose asChild>
-                        <Button variant="outline">Close</Button>
+                        <Button variant="outline">Cerrar</Button>
                     </DialogClose>
                 </DialogFooter>
             </DialogContent>

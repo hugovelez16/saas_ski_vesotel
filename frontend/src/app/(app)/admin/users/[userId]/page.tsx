@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar, Building2, Wallet, Database, ArrowLeft, Loader2, Sparkles, Moon, Trash2, Pencil } from "lucide-react";
+import { Calendar, Building2, Wallet, Database, ArrowLeft, Loader2, Sparkles, Moon, Trash2, Pencil, Shield } from "lucide-react";
 import { format } from "date-fns";
 import { useState } from "react";
 import { DataTable } from "@/components/ui/data-table";
@@ -18,6 +18,359 @@ import { useToast } from "@/hooks/use-toast";
 import { JsonEditor } from "@/components/admin/json-editor";
 import { UserEditDialog } from "@/components/admin/user-edit-dialog";
 import { UserCreateWorkLogDialog } from "@/components/work-log/user-dialog";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+    Form,
+    FormControl,
+    FormDescription,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { useEffect } from "react";
+
+const numericSchema = z.preprocess(
+    (val) => (val === "" || val === undefined || val === null ? 0 : val),
+    z.coerce.number().min(0)
+);
+
+const memberConfigSchema = z.object({
+    role: z.string(),
+    isActive: z.boolean(),
+    isGross: z.boolean(),
+    rates: z.record(numericSchema),
+    taxOverrides: z.object({
+        ss: z.preprocess(
+            (val) => (val === "" || val === undefined ? null : val),
+            z.coerce.number().min(0).max(100).optional().nullable()
+        ),
+        irpf: z.preprocess(
+            (val) => (val === "" || val === undefined || val === null ? 0 : val),
+            z.coerce.number().min(0).max(100)
+        ),
+        extra: z.preprocess(
+            (val) => (val === "" || val === undefined || val === null ? 0 : val),
+            z.coerce.number().min(0).max(100)
+        ),
+    })
+});
+
+type MemberConfigValues = z.infer<typeof memberConfigSchema>;
+
+function CompanyMemberConfigCard({ user, company, onUpdate }: { user: any, company: any, onUpdate: () => void }) {
+    const { toast } = useToast();
+    const worklogDefinitions = company.worklogDefinitions || {};
+    const ratesConfig = company.ratesConfig || {};
+
+    const form = useForm<MemberConfigValues>({
+        resolver: zodResolver(memberConfigSchema),
+        defaultValues: {
+            role: company.role || "worker",
+            isActive: company.isActiveMember ?? true,
+            isGross: true,
+            rates: {},
+            taxOverrides: {
+                ss: null,
+                irpf: 0,
+                extra: 0,
+            }
+        }
+    });
+
+    useEffect(() => {
+        const shiftKeys = Object.keys(worklogDefinitions);
+        const initialRates: Record<string, number> = {};
+        let isGross = true;
+        let taxOverrides = { ss: null, irpf: 0, extra: 0 };
+
+        let foundTaxes = false;
+        for (const key of shiftKeys) {
+            const shiftData = ratesConfig[key];
+            if (shiftData && typeof shiftData === 'object') {
+                initialRates[key] = shiftData.base_rate || 0;
+                if (!foundTaxes) {
+                    isGross = shiftData.is_gross !== undefined ? shiftData.is_gross : true;
+                    if (shiftData.tax_overrides) {
+                        taxOverrides = {
+                            ss: (shiftData.tax_overrides.ss !== undefined && shiftData.tax_overrides.ss !== null) ? parseFloat((shiftData.tax_overrides.ss * 100).toFixed(4)) : null,
+                            irpf: parseFloat(((shiftData.tax_overrides.irpf || 0) * 100).toFixed(4)),
+                            extra: parseFloat(((shiftData.tax_overrides.extra || 0) * 100).toFixed(4)),
+                        };
+                        foundTaxes = true;
+                    }
+                }
+            } else {
+                initialRates[key] = 0;
+            }
+        }
+
+        form.reset({
+            role: company.role || "worker",
+            isActive: company.isActiveMember ?? true,
+            isGross,
+            rates: initialRates,
+            taxOverrides
+        });
+    }, [company, worklogDefinitions, ratesConfig, form]);
+
+    const mutation = useMutation({
+        mutationFn: (data: any) => updateCompanyMember(company.id, user.id, data),
+        onSuccess: () => {
+            toast({ title: "Configuración actualizada" });
+            onUpdate();
+        },
+        onError: () => toast({ title: "Error al actualizar", variant: "destructive" })
+    });
+
+    function onSubmit(values: MemberConfigValues) {
+        console.log("Submitting configuration:", values);
+        const newRatesConfig: Record<string, any> = {};
+        const shiftKeys = Object.keys(worklogDefinitions);
+
+        for (const key of shiftKeys) {
+            newRatesConfig[key] = {
+                base_rate: Number(values.rates[key]) || 0,
+                is_gross: values.isGross,
+                tax_overrides: {
+                    ss: values.taxOverrides.ss !== null ? Number(values.taxOverrides.ss) / 100 : null,
+                    irpf: Number(values.taxOverrides.irpf) / 100,
+                    extra: Number(values.taxOverrides.extra) / 100
+                }
+            };
+        }
+
+        mutation.mutate({
+            role: values.role,
+            isActive: values.isActive,
+            ratesConfig: newRatesConfig
+        });
+    }
+
+    const onFormError = (errors: any) => {
+        console.error("Form validation errors:", errors);
+        toast({
+            title: "Error de validación",
+            description: "Por favor, revisa los campos del formulario.",
+            variant: "destructive"
+        });
+    };
+
+    return (
+        <Card className="border-indigo-100 dark:border-indigo-900 shadow-sm overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between bg-indigo-50/30 dark:bg-indigo-950/10 border-b">
+                <div className="flex items-center gap-2">
+                    <Building2 className="h-5 w-5 text-indigo-600" />
+                    <div>
+                        <CardTitle className="text-lg">{company.name}</CardTitle>
+                        <CardDescription className="text-xs">ID: {company.id}</CardDescription>
+                    </div>
+                </div>
+                <div className="flex items-center gap-3">
+                    <Badge variant={company.isActiveMember ? 'default' : 'secondary'}>
+                        {company.isActiveMember ? 'Activo' : 'Inactivo'}
+                    </Badge>
+                    <Badge variant="outline" className="capitalize">{company.role}</Badge>
+                </div>
+            </CardHeader>
+            <CardContent className="pt-6">
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit, onFormError)} className="space-y-8">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="md:col-span-1 space-y-4">
+                                <h3 className="text-sm font-semibold flex items-center gap-2 text-indigo-600">
+                                    <Shield className="h-4 w-4" />
+                                    Membresía
+                                </h3>
+                                <FormField
+                                    control={form.control}
+                                    name="role"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel className="text-xs uppercase text-muted-foreground font-bold tracking-wider">Rol en Empresa</FormLabel>
+                                            <Select onValueChange={field.onChange} value={field.value}>
+                                                <FormControl>
+                                                    <SelectTrigger className="h-9">
+                                                        <SelectValue placeholder="Seleccionar rol" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    <SelectItem value="worker">Trabajador</SelectItem>
+                                                    <SelectItem value="manager">Gestor / Supervisor</SelectItem>
+                                                    <SelectItem value="admin">Administrador Empresa</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                <FormField
+                                    control={form.control}
+                                    name="isActive"
+                                    render={({ field }) => (
+                                        <FormItem className="flex flex-row items-center justify-between rounded-md border bg-slate-50 dark:bg-slate-900 px-3 py-2">
+                                            <div className="space-y-0.5">
+                                                <FormLabel className="text-sm">Usuario Activo</FormLabel>
+                                                <FormDescription className="text-[10px]">Permitir registros</FormDescription>
+                                            </div>
+                                            <FormControl>
+                                                <Switch checked={field.value} onCheckedChange={field.onChange} />
+                                            </FormControl>
+                                        </FormItem>
+                                    )}
+                                />
+                            </div>
+
+                            <div className="md:col-span-2 space-y-4">
+                                <h3 className="text-sm font-semibold flex items-center gap-2 text-indigo-600">
+                                    <Wallet className="h-4 w-4" />
+                                    Tarifas por Turno
+                                </h3>
+                                <div className="grid grid-cols-2 gap-4">
+                                    {Object.entries(worklogDefinitions).map(([key, def]: [string, any]) => (
+                                        <FormField
+                                            key={key}
+                                            control={form.control}
+                                            name={`rates.${key}`}
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel className="text-xs uppercase text-muted-foreground font-bold tracking-wider">{def.label}</FormLabel>
+                                                    <FormControl>
+                                                        <div className="relative">
+                                                            <span className="absolute left-3 top-2 text-muted-foreground text-xs">€</span>
+                                                            <Input 
+                                                                type="number" 
+                                                                step="0.01" 
+                                                                {...field} 
+                                                                value={field.value ?? ""} 
+                                                                onChange={field.onChange}
+                                                                className="pl-7 h-9" 
+                                                            />
+                                                        </div>
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4 border-t pt-6">
+                            <div className="flex items-center justify-between mb-2">
+                                <h3 className="text-sm font-semibold flex items-center gap-2 text-indigo-600">
+                                    <Database className="h-4 w-4" />
+                                    Impuestos y Deducciones (Per-User)
+                                </h3>
+                                <FormField
+                                    control={form.control}
+                                    name="isGross"
+                                    render={({ field }) => (
+                                        <FormItem className="flex flex-row items-center gap-2 space-y-0">
+                                            <FormLabel className="text-xs font-bold text-muted-foreground uppercase">Sobre Bruto</FormLabel>
+                                            <FormControl>
+                                                <Switch checked={field.value} onCheckedChange={field.onChange} />
+                                            </FormControl>
+                                        </FormItem>
+                                    )}
+                                />
+                            </div>
+
+                            {form.watch("isGross") && (
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                    <FormField
+                                        control={form.control}
+                                        name="taxOverrides.ss"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel className="text-xs font-bold text-muted-foreground">SS (%)</FormLabel>
+                                                <FormControl>
+                                                    <Input
+                                                        type="number"
+                                                        step="0.0001"
+                                                        placeholder="Defecto"
+                                                        value={field.value ?? ""}
+                                                        onChange={e => field.onChange(e.target.value === "" ? null : Number(e.target.value))}
+                                                        className="h-9"
+                                                    />
+                                                </FormControl>
+                                                <FormDescription className="text-[10px]">Vacío para usar global</FormDescription>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={form.control}
+                                        name="taxOverrides.irpf"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel className="text-xs font-bold text-muted-foreground">IRPF (%)</FormLabel>
+                                                <FormControl>
+                                                    <Input 
+                                                        type="number" 
+                                                        step="0.0001" 
+                                                        {...field} 
+                                                        value={field.value ?? ""} 
+                                                        onChange={field.onChange}
+                                                        className="h-9" 
+                                                    />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={form.control}
+                                        name="taxOverrides.extra"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel className="text-xs font-bold text-muted-foreground">EXTRA (%)</FormLabel>
+                                                <FormControl>
+                                                    <Input 
+                                                        type="number" 
+                                                        step="0.0001" 
+                                                        {...field} 
+                                                        value={field.value ?? ""} 
+                                                        onChange={e => field.onChange(e.target.value === "" ? 0 : Number(e.target.value))}
+                                                        className="h-9" 
+                                                    />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex justify-end pt-2">
+                            <Button type="submit" disabled={mutation.isPending} className="bg-indigo-600 hover:bg-indigo-700 shadow-md transition-all">
+                                {mutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Pencil className="mr-2 h-4 w-4" />}
+                                Actualizar Configuración en {company.name}
+                            </Button>
+                        </div>
+                    </form>
+                </Form>
+            </CardContent>
+        </Card>
+    );
+}
 
 export default function UserDetailPage() {
     const params = useParams();
@@ -154,11 +507,7 @@ export default function UserDetailPage() {
             <Tabs defaultValue="worklogs" className="w-full">
                 <TabsList className="bg-slate-100 dark:bg-slate-900 p-1 rounded-lg">
                     <TabsTrigger value="worklogs">Historial de Partes</TabsTrigger>
-                    <TabsTrigger value="companies">Empresas & Tasas</TabsTrigger>
-                    <TabsTrigger value="master" className="text-indigo-600 font-bold border-l-2 border-indigo-200 ml-2">
-                        <Database className="h-4 w-4 mr-2" />
-                        Master Rates
-                    </TabsTrigger>
+                    <TabsTrigger value="companies">Empresas & Configuración</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="worklogs" className="pt-4">
@@ -183,52 +532,18 @@ export default function UserDetailPage() {
                 </TabsContent>
 
                 <TabsContent value="companies" className="pt-4">
-                    <div className="grid gap-6">
+                    <div className="grid gap-8">
                         {companies.map((company) => (
-                            <Card key={company.id}>
-                                <CardHeader className="flex flex-row items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <Building2 className="h-5 w-5 text-indigo-600" />
-                                        <CardTitle>{company.name}</CardTitle>
-                                    </div>
-                                    <Badge variant="secondary" className="capitalize">{company.role}</Badge>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="text-sm text-muted-foreground">
-                                        Estado en empresa: <Badge variant={company.is_active_member ? 'default' : 'secondary'}>{company.is_active_member ? 'Activo' : 'Inactivo'}</Badge>
-                                    </div>
-                                </CardContent>
-                            </Card>
+                            <CompanyMemberConfigCard 
+                                key={company.id}
+                                user={user} 
+                                company={company} 
+                                onUpdate={() => queryClient.invalidateQueries({ queryKey: ["user-companies", userId] })} 
+                            />
                         ))}
                     </div>
                 </TabsContent>
 
-                <TabsContent value="master" className="pt-4">
-                    <div className="space-y-6">
-                        {companies.map((company) => (
-                            <Card key={company.id} className="border-indigo-100 dark:border-indigo-900 shadow-sm">
-                                <CardHeader className="bg-indigo-50/30 dark:bg-indigo-950/10">
-                                    <CardTitle className="text-sm flex items-center gap-2">
-                                        <Wallet className="h-4 w-4 text-indigo-600" />
-                                        Configuración Económica en {company.name}
-                                    </CardTitle>
-                                    <CardDescription className="text-xs text-[10px]">Edición directa de rates_config (Precios, IRPF, etc.)</CardDescription>
-                                </CardHeader>
-                                <CardContent className="pt-4">
-                                    <JsonEditor
-                                        initialValue={company.rates_config || {}}
-                                        onSave={(val) => updateMemberMutation.mutate({
-                                            companyId: company.id,
-                                            data: { rates_config: val }
-                                        })}
-                                        label="Rates JSON"
-                                        description="Valores de hourly_rate, daily_rate, deduction_irpf, etc."
-                                    />
-                                </CardContent>
-                            </Card>
-                        ))}
-                    </div>
-                </TabsContent>
             </Tabs>
 
             {/* Dialog de Edición de Log */}

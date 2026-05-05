@@ -89,7 +89,7 @@ def create_refresh_token(data: dict):
     to_encode.update({"exp": expire, "iat": now, "type": "refresh", "jti": secrets.token_hex(16)})
     return jwt.encode(to_encode, PRIVATE_KEY, algorithm=ALGORITHM)
 
-def generate_user_tokens(db: Session, user: models.User, company_id: Optional[str] = None, role: Optional[str] = None, force_none: bool = False):
+def generate_user_tokens(db: Session, user: models.User, company_id: Optional[str] = None, role: Optional[str] = None, force_none: bool = False, scope: Optional[str] = None):
     """
     SRE: Enhanced token generation with platform and company context.
     If company_id or role are not provided, it selects defaults based on user profile and memberships.
@@ -132,7 +132,8 @@ def generate_user_tokens(db: Session, user: models.User, company_id: Optional[st
         "sub": str(user.id),
         "is_admin": is_platform_admin,
         "cid": active_cid,
-        "role": active_role
+        "role": active_role,
+        "scope": scope or "full"
     }
     
     access_token = create_access_token(data=data)

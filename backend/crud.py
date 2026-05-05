@@ -110,9 +110,14 @@ def calculate_dynamic_work_log(log_data: dict, company_def: dict, user_rate: dic
     user_overrides = user_rate.get("tax_overrides", {})
     company_defaults = company_tax_config if company_tax_config else {}
     
-    irpf = float(user_overrides.get("irpf", company_defaults.get("irpf_base", 0)))
-    ss = float(user_overrides.get("ss", company_defaults.get("social_security", 0)))
-    extra = float(user_overrides.get("extra", company_defaults.get("extra", 0)))
+    irpf_val = user_overrides.get("irpf")
+    irpf = float(irpf_val if irpf_val is not None else company_defaults.get("irpf_base", 0))
+    
+    ss_val = user_overrides.get("ss")
+    ss = float(ss_val if ss_val is not None else company_defaults.get("social_security", 0))
+    
+    extra_val = user_overrides.get("extra")
+    extra = float(extra_val if extra_val is not None else company_defaults.get("extra", 0))
     
     duration = 0.0
     
@@ -323,6 +328,10 @@ def create_work_log(db: Session, work_log: schemas.WorkLogCreate):
     work_type = work_log.type.value if hasattr(work_log.type, 'value') else work_log.type
     type_def = defs.get(work_type, {"unit": "hours", "label": work_type})
     type_rate = rates.get(work_type, {})
+    
+    # Validation: Ensure rate is set (and non-zero) unless it's a manual override
+    if work_log.net_amount is None and float(type_rate.get("base_rate", 0)) <= 0:
+        raise ValueError(f"No se ha encontrado un precio (rate) configurado para el tipo '{work_type}' para este usuario.")
 
     # Use Dynamic Engine
     calc = calculate_dynamic_work_log(work_log.model_dump(), type_def, type_rate, company.tax_config if company else None)
@@ -330,8 +339,15 @@ def create_work_log(db: Session, work_log: schemas.WorkLogCreate):
     # Prepare DB Obj
     work_log_data = work_log.model_dump()
     # Remove calculated and renamed fields
-    for k in ['net_amount', 'gross_amount', 'rate_applied', 'duration']:
+    for k in ['net_amount', 'gross_amount', 'rate_applied', 'duration', 'amount']:
         work_log_data.pop(k, None)
+
+    # Handle group_id which is not a dedicated column
+    group_id = work_log_data.pop('group_id', None)
+    extra_data = work_log_data.get('extra_data') or {}
+    if group_id:
+        extra_data['group_id'] = str(group_id)
+    work_log_data['extra_data'] = extra_data
 
     db_work_log = models.WorkLog(
         **work_log_data,
@@ -369,6 +385,12 @@ def create_work_log_bulk(db: Session, work_log_bulk: schemas.WorkLogBulkCreate):
         rates = member.rates_config or {} if member else {}
         type_rate = rates.get(work_type, {})
         
+        # Validation: Ensure rate is set (and non-zero) unless it's a manual override
+        if work_log_bulk.net_amount is None and float(type_rate.get("base_rate", 0)) <= 0:
+            user_obj = db.query(models.User).filter(models.User.id == user_id).first()
+            user_name = f"{user_obj.first_name} {user_obj.last_name}" if user_obj else str(user_id)
+            raise ValueError(f"El usuario {user_name} no tiene un precio (rate) configurado para el tipo '{work_type}'.")
+        
         # Build individual log data
         individual_log_data = work_log_bulk.model_dump(by_alias=False)
         individual_log_data.pop('user_ids', None)
@@ -380,8 +402,15 @@ def create_work_log_bulk(db: Session, work_log_bulk: schemas.WorkLogBulkCreate):
         
         # Prepare DB Obj
         # Remove calculated and renamed fields
-        for k in ['net_amount', 'gross_amount', 'rate_applied', 'duration']:
+        for k in ['net_amount', 'gross_amount', 'rate_applied', 'duration', 'amount']:
             individual_log_data.pop(k, None)
+            
+        # Handle group_id which is not a dedicated column
+        group_id_val = individual_log_data.pop('group_id', None)
+        extra_data_val = individual_log_data.get('extra_data') or {}
+        if group_id_val:
+            extra_data_val['group_id'] = str(group_id_val)
+        individual_log_data['extra_data'] = extra_data_val
             
         db_work_log = models.WorkLog(
             **individual_log_data,
@@ -538,12 +567,15 @@ def get_joinable_companies(db: Session, user_id: str):
         
     return companies
 
-def get_user_companies(db: Session, user_id: str):
+def get_user_companies(db: Session, user_id: str, include_inactive: bool = False):
     """Get companies the user is a member of (joined), merging member-specific settings."""
-    members = db.query(models.CompanyMember).filter(
-        models.CompanyMember.user_id == user_id,
-        models.CompanyMember.is_active == True
-    ).all()
+    query = db.query(models.CompanyMember).filter(
+        models.CompanyMember.user_id == user_id
+    )
+    if not include_inactive:
+        query = query.filter(models.CompanyMember.is_active == True)
+        
+    members = query.all()
     
     results = []
     for m in members:
@@ -566,7 +598,9 @@ def get_user_companies(db: Session, user_id: str):
             "created_at": company.created_at,
             "updated_at": company.updated_at,
             "settings": effective,
-            "role": m.role.value if hasattr(m.role, 'value') else m.role
+            "role": m.role.value if hasattr(m.role, 'value') else m.role,
+            "is_active_member": m.is_active,
+            "rates_config": m.rates_config
         })
     return results
 

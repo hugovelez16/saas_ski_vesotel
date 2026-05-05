@@ -347,12 +347,14 @@ async def switch_scope(
         if not data.company_id:
             # Special case: Reset to Admin ONLY context
             access_token, refresh_token = auth.generate_user_tokens(
-                db, current_user, company_id=None, role=None, force_none=True
+                db, current_user, company_id=None, role=None, force_none=True,
+                scope=getattr(current_user, "token_scope", None)
             )
         else:
             requested_role = data.company_role or "manager"
             access_token, refresh_token = auth.generate_user_tokens(
-                db, current_user, company_id=data.company_id, role=requested_role
+                db, current_user, company_id=data.company_id, role=requested_role,
+                scope=getattr(current_user, "token_scope", None)
             )
     else:
         # Verify membership and role for regular users
@@ -374,7 +376,8 @@ async def switch_scope(
                 raise HTTPException(status_code=403, detail="Insufficient permissions for manager scope")
             
         access_token, refresh_token = auth.generate_user_tokens(
-            db, current_user, company_id=data.company_id, role=requested_role
+            db, current_user, company_id=data.company_id, role=requested_role,
+            scope=getattr(current_user, "token_scope", None)
         )
     
     response.set_cookie(
@@ -540,7 +543,10 @@ def create_work_log(work_log: schemas.WorkLogCreate, db: Session = Depends(get_d
         if not is_manager_of_company(db, current_user, work_log.company_id):
              raise HTTPException(status_code=403, detail="Cannot create work logs for other users")
         
-    return crud.create_work_log(db=db, work_log=work_log)
+    try:
+        return crud.create_work_log(db=db, work_log=work_log)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @app.post("/work-logs/bulk", response_model=schemas.WorkLogResponse)
 def create_work_log_bulk(
@@ -555,8 +561,11 @@ def create_work_log_bulk(
     if not is_manager_of_company(db, current_user, work_log_bulk.company_id):
          raise HTTPException(status_code=403, detail="Only managers can create bulk work logs")
         
-    logs = crud.create_work_log_bulk(db=db, work_log_bulk=work_log_bulk)
-    return logs # Returns the first one created as a representative
+    try:
+        logs = crud.create_work_log_bulk(db=db, work_log_bulk=work_log_bulk)
+        return logs # Returns the first one created as a representative
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/work-logs", response_model=List[schemas.WorkLogResponse])
 def read_work_logs(
@@ -575,7 +584,7 @@ def read_work_logs(
     Supervisors can filter by company_id for their companies.
     """
     target_user_id = current_user.id
-    target_company_id = company_id
+    target_company_id = company_id or getattr(current_user, "active_company_id", None)
     
     # Permission Logic
     if getattr(current_user, "is_platform_admin", False):
@@ -595,14 +604,14 @@ def read_work_logs(
         # Check if user is manager/admin of the requested company OR if they are checking availability for a user in their managed company
         is_supervisor_request = False
         
-        if company_id:
-             if is_manager_of_company(db, current_user, UUID(company_id) if isinstance(company_id, str) else company_id):
+        if target_company_id:
+             if is_manager_of_company(db, current_user, UUID(target_company_id) if isinstance(target_company_id, str) else target_company_id):
                  is_supervisor_request = True
                  target_user_id = None # See all logs for this company
                  if user_id:
                      target_user_id = user_id # Filter specific user in this company
 
-        if is_manager_request:
+        if is_supervisor_request:
              final_user_id = target_user_id
         else:
             # Regular user or Manager accessing outside their scope
@@ -620,7 +629,7 @@ def read_work_logs(
         skip=skip, 
         limit=limit, 
         user_id=str(final_user_id) if final_user_id else None, 
-        company_id=company_id,
+        company_id=target_company_id,
         start_date=start_date,
         end_date=end_date
     )
@@ -897,7 +906,7 @@ def read_user_companies_admin(user_id: str, db: Session = Depends(get_db), curre
     is_platform_admin = getattr(current_user, "is_platform_admin", False)
     if not is_platform_admin and not check_supervisor_access(db, current_user, user_id):
         raise HTTPException(status_code=403, detail="Not authorized")
-    return crud.get_user_companies(db, user_id)
+    return crud.get_user_companies(db, user_id, include_inactive=True)
 
 # --- Admin Company Management ---
 
@@ -1182,8 +1191,16 @@ def read_company_rates(company_id: str, db: Session = Depends(get_db), current_u
 
 @app.put("/companies/{company_id}/members/{user_id}", response_model=schemas.CompanyMemberResponse)
 def update_company_member(company_id: str, user_id: str, member_data: schemas.CompanyMemberUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not is_manager_of_company(db, current_user, company_id):
+    is_manager = is_manager_of_company(db, current_user, company_id)
+    is_self = str(user_id) == str(current_user.id)
+    
+    if not is_manager and not is_self:
          raise HTTPException(status_code=403, detail="Not authorized")
+    
+    # Security: Non-managers cannot promote themselves or change their membership status
+    if not is_manager:
+        member_data.role = None
+        member_data.is_active = None
     
     member = crud.update_company_member(db, company_id, user_id, member_data)
     if not member:

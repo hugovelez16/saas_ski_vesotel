@@ -18,6 +18,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getMyCompanies } from "@/lib/api/companies";
 import type { WorkLog, WorkLogCreate } from "@/lib/types";
 import { WorkLogForm } from "./work-log-form";
+import { createWorkLog, updateWorkLog } from "@/lib/api/work-logs";
 import api from "@/lib/api";
 
 interface UserCreateWorkLogDialogProps {
@@ -29,6 +30,7 @@ interface UserCreateWorkLogDialogProps {
     onOpenChange?: (open: boolean) => void;
     initialDate?: Date | null;
     companies?: any[];
+    applyToGroup?: boolean;
 }
 
 export function UserCreateWorkLogDialog({
@@ -40,7 +42,8 @@ export function UserCreateWorkLogDialog({
     open: controlledOpen,
     onOpenChange,
     companies: providedCompanies,
-    initialDate
+    initialDate,
+    applyToGroup: initialApplyToGroup = false
 }: UserCreateWorkLogDialogProps) {
     const [internalOpen, setInternalOpen] = useState(false);
     const isControlled = controlledOpen !== undefined;
@@ -144,11 +147,21 @@ export function UserCreateWorkLogDialog({
             return;
         }
 
-        let logData: WorkLogCreate = {
-            ...formData as WorkLogCreate,
+        let logData: any = {
+            ...formData,
             userId: user.id,
             type: logType,
         };
+
+        // SaaS Logic: Ensure startDate/endDate are present for all types
+        // In 'particular' (single day) mode, they should match 'date'
+        if (logType === 'particular' || !logData.startDate) {
+            logData.startDate = logData.date;
+            logData.endDate = logData.date;
+        }
+
+        // Remove redundant frontend-only fields
+        delete logData.date;
 
         // If editing, we remove calculated fields to force backend recalculation
         // EXCEPT if the company is in manual input mode (but UserCreateWorkLogDialog doesn't easily know this, 
@@ -164,10 +177,10 @@ export function UserCreateWorkLogDialog({
 
         try {
             if (logToEdit) {
-                await api.put(`/work-logs/${logToEdit.id}`, logData);
+                await updateWorkLog(logToEdit.id, logData, initialApplyToGroup);
                 toast({ title: "Success", description: "Work log updated successfully." });
             } else {
-                await api.post("/work-logs/", logData);
+                await createWorkLog(logData);
                 toast({ title: "Success", description: "Work log created successfully." });
             }
 
@@ -181,8 +194,16 @@ export function UserCreateWorkLogDialog({
 
         } catch (error: any) {
             console.error("Error saving work log:", error);
-            const msg = error.response?.data?.detail || "Could not save the log.";
-            toast({ title: "Error", description: msg, variant: "destructive" });
+            let msg = error.response?.data?.detail || "Could not save the log.";
+            
+            // Handle FastAPI/Pydantic validation errors (array of objects)
+            if (Array.isArray(msg)) {
+                msg = msg.map(e => `${e.loc.join('.')}: ${e.msg}`).join(', ');
+            } else if (typeof msg === 'object') {
+                msg = JSON.stringify(msg);
+            }
+            
+            toast({ title: "Error", description: String(msg), variant: "destructive" });
         } finally {
             setIsLoading(false);
         }

@@ -8,6 +8,8 @@ import api from "@/lib/api"
 import { getMyCompanies } from "@/lib/api/companies"
 import { getUserRates } from "@/lib/api/settings"
 import { WorkLog } from "@/lib/types"
+import { getWorkLogs } from "@/lib/api/work-logs"
+import { WorkLogDetailsDialog } from "@/components/work-log/details-dialog"
 import { UserCreateWorkLogDialog } from "@/components/work-log/user-dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { NotificationsSection } from "@/components/notifications-section"
@@ -29,14 +31,16 @@ export default function DashboardPage() {
   const handlePrevMonth = () => setSelectedDate(prev => subMonths(prev, 1))
   const handleNextMonth = () => setSelectedDate(prev => addMonths(prev, 1))
 
-  // Edit Dialog State
+  // Edit/Details Dialog State
   const [selectedLog, setSelectedLog] = useState<WorkLog | null>(null)
   const [isEditOpen, setIsEditOpen] = useState(false)
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false)
+  const [applyToGroup, setApplyToGroup] = useState(false)
 
   // Queries
   const { data: workLogs = [], isLoading: loadingLogs } = useQuery({
-    queryKey: ["workLogs"],
-    queryFn: async () => (await api.get<WorkLog[]>('/work-logs/')).data,
+    queryKey: ["workLogs", user?.active_company_id],
+    queryFn: () => getWorkLogs(),
     enabled: !!user,
   });
 
@@ -110,12 +114,13 @@ export default function DashboardPage() {
           <OverviewV3
             workLogs={workLogs}
             companies={myCompanies}
+            activeCompanyId={user?.active_company_id}
             onAddRecord={() => { }}
             onNavigate={setActiveTab}
             selectedDate={selectedDate}
             onViewLog={(log) => {
               setSelectedLog(log)
-              setIsEditOpen(true)
+              setIsDetailsOpen(true)
             }}
           />
         </TabsContent>
@@ -132,6 +137,7 @@ export default function DashboardPage() {
         open={isEditOpen}
         onOpenChange={setIsEditOpen}
         logToEdit={selectedLog}
+        applyToGroup={applyToGroup}
         onLogUpdate={() => {
           queryClient.invalidateQueries({ queryKey: ["workLogs"] })
           setIsEditOpen(false)
@@ -139,6 +145,23 @@ export default function DashboardPage() {
       >
         <div className="hidden" />
       </UserCreateWorkLogDialog>
+      
+      {/* Details Dialog */}
+      <WorkLogDetailsDialog
+        log={selectedLog}
+        open={isDetailsOpen}
+        onOpenChange={setIsDetailsOpen}
+        userSettings={
+          selectedLog
+            ? userRates.find(r => r.companyId === selectedLog.companyId) || null
+            : null
+        }
+        onEdit={(log, group) => {
+          setApplyToGroup(group)
+          setIsDetailsOpen(false)
+          setIsEditOpen(true)
+        }}
+      />
     </div>
   )
 }

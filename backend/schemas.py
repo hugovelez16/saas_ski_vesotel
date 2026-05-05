@@ -55,7 +55,7 @@ class WorkLogResponse(WorkLogBase):
     """Schema for WorkLog response data."""
     id: UUID
     user_id: UUID
-    amount: Optional[float]
+    amount: Optional[float] = None
     gross_amount: Optional[float] = Field(None, alias="grossAmount")
     rate_applied: Optional[float]
     
@@ -171,9 +171,9 @@ class Company(CompanyBase):
         from_attributes = True
 
 class CompanyResponse(Company):
-    is_active_member: Optional[bool] = True
+    is_active_member: Optional[bool] = Field(True, alias="isActiveMember")
     role: Optional[str] = None
-    pass
+    rates_config: Optional[Dict[str, Any]] = Field(None, alias="ratesConfig")
 
 
 class CompanyMemberBase(CamelModel):
@@ -182,7 +182,7 @@ class CompanyMemberBase(CamelModel):
     rates_config: Optional[Dict[str, Any]] = Field(None, alias="ratesConfig")
     settings: Optional[Dict[str, Any]] = None
 
-class CompanyMemberUpdate(BaseModel):
+class CompanyMemberUpdate(CamelModel):
     role: Optional[str] = None
     is_active: Optional[bool] = None
     rates_config: Optional[Dict[str, Any]] = Field(None, alias="ratesConfig")
@@ -220,6 +220,7 @@ class TokenData(BaseModel):
     company_role: Optional[str] = None
     is_platform_admin: bool = False
     scope: str = "full"
+    email: Optional[EmailStr] = None
 
 class SessionResponse(CamelModel):
     id: UUID

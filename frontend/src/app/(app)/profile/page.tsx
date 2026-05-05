@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import { Loader2, Building2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -36,11 +36,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { useToast } from "@/hooks/use-toast";
 import { getUserRates, updateUserRates, getCompanies } from "@/lib/api/settings";
-import { getAvailableCompanies, joinCompany, getMyCompanies } from "@/lib/api/companies";
+import { getMyCompanies } from "@/lib/api/companies";
 import { updateMe, changePassword } from "@/lib/api/users";
 import { useAuth } from "@/context/AuthContext";
 import { Company, UserCompanyRate } from "@/lib/types";
@@ -62,10 +61,7 @@ const passwordSchema = z.object({
 });
 
 const rateFormSchema = z.object({
-  hourlyRate: z.coerce.number().min(0),
-  dailyRate: z.coerce.number().min(0),
-  nightRate: z.coerce.number().min(0),
-  coordinationRate: z.coerce.number().min(0),
+  rates: z.record(z.coerce.number().min(0)).default({}),
   isGross: z.boolean().default(true),
   deductionSs: z.coerce.number().min(0).max(100).optional(),
   deductionIrpf: z.coerce.number().min(0).max(100).default(0),
@@ -84,52 +80,32 @@ export default function ProfilePage() {
   // Queries
 
 
-  const { data: availableCompanies = [] } = useQuery({
-    queryKey: ["availableCompanies"],
-    queryFn: getAvailableCompanies,
-  });
 
   const { data: myCompanies = [] } = useQuery({
     queryKey: ["myCompanies"],
     queryFn: getMyCompanies,
   });
 
-  // Auto-select default company
+  // Auto-select company from active context or default
   useEffect(() => {
-    if (!selectedCompanyId && user?.default_company_id && myCompanies.find((c: Company) => c.id === user.default_company_id)) {
+    if (user?.active_company_id) {
+      setSelectedCompanyId(user.active_company_id);
+    } else if (!selectedCompanyId && user?.default_company_id) {
       setSelectedCompanyId(user.default_company_id);
+    } else if (!selectedCompanyId && myCompanies.length > 0) {
+      setSelectedCompanyId(myCompanies[0].id);
     }
-  }, [user, myCompanies, selectedCompanyId]);
+  }, [user?.active_company_id, user?.default_company_id, myCompanies]);
 
   const currentCompany = myCompanies.find((c: Company) => c.id === selectedCompanyId);
   const companySettings = currentCompany?.settings || {};
-  const allowedRates = companySettings.allowed_rates as string[] | undefined;
-
+  const worklogDefinitions = currentCompany?.worklogDefinitions || {};
 
   const { data: rates, isLoading: isLoadingRates } = useQuery({
     queryKey: ["rates", selectedCompanyId],
     queryFn: () => getUserRates(selectedCompanyId),
     enabled: !!selectedCompanyId,
   });
-
-  // ... inside render ...
-
-  <div className="mb-6">
-    <Label className="mb-2 block">Select Company</Label>
-    <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
-      <SelectTrigger className="w-[280px]">
-        <SelectValue placeholder="Select a company" />
-      </SelectTrigger>
-      <SelectContent>
-        {myCompanies
-          .map((company: Company) => (
-            <SelectItem key={company.id} value={company.id}>
-              {company.name}
-            </SelectItem>
-          ))}
-      </SelectContent>
-    </Select>
-  </div>
 
   // Forms
   const userForm = useForm({
@@ -144,10 +120,7 @@ export default function ProfilePage() {
   const rateForm = useForm<RateFormValues>({
     resolver: zodResolver(rateFormSchema),
     defaultValues: {
-      hourlyRate: 0,
-      dailyRate: 0,
-      nightRate: 0,
-      coordinationRate: 0,
+      rates: {},
       isGross: true,
       deductionSs: undefined,
       deductionIrpf: 0,
@@ -178,30 +151,61 @@ export default function ProfilePage() {
   // Sync rate form
   useEffect(() => {
     if (rates && rates.length > 0) {
-      const rate = rates[0];
+      const rateConfig = rates[0] as any;
+      
+      let isGross = true;
+      let deductionSs: number | undefined = undefined;
+      let deductionIrpf: number | undefined = undefined;
+      let deductionExtra: number | undefined = undefined;
+      
+      const shiftKeys = Object.keys(worklogDefinitions || {});
+      const shiftRates: Record<string, number> = {};
+      
+      let foundTaxes = false;
+      
+      for (const key of shiftKeys) {
+         const shiftData = rateConfig[key];
+         if (shiftData && typeof shiftData === 'object') {
+             shiftRates[key] = shiftData.base_rate || 0;
+             if (!foundTaxes) {
+                 isGross = shiftData.is_gross !== undefined ? shiftData.is_gross : true;
+                 if (shiftData.tax_overrides) {
+                     deductionSs = (shiftData.tax_overrides.ss !== undefined && shiftData.tax_overrides.ss !== null) ? shiftData.tax_overrides.ss * 100 : undefined;
+                     deductionIrpf = (shiftData.tax_overrides.irpf !== undefined && shiftData.tax_overrides.irpf !== null) ? shiftData.tax_overrides.irpf * 100 : undefined;
+                     deductionExtra = (shiftData.tax_overrides.extra !== undefined && shiftData.tax_overrides.extra !== null) ? shiftData.tax_overrides.extra * 100 : undefined;
+                     foundTaxes = true;
+                 }
+             }
+         } else {
+             shiftRates[key] = 0;
+         }
+      }
+
+      // Legacy fallback if they have old flat data and no new format was found
+      if (!foundTaxes && rateConfig.isGross !== undefined) {
+         isGross = rateConfig.isGross;
+         deductionSs = rateConfig.deductionSs !== undefined && rateConfig.deductionSs !== null ? rateConfig.deductionSs * 100 : undefined;
+         deductionIrpf = (rateConfig.deductionIrpf !== undefined && rateConfig.deductionIrpf !== null) ? rateConfig.deductionIrpf * 100 : undefined;
+         deductionExtra = (rateConfig.deductionExtra !== undefined && rateConfig.deductionExtra !== null) ? rateConfig.deductionExtra * 100 : undefined;
+      }
+
       rateForm.reset({
-        hourlyRate: rate.hourlyRate || 0,
-        dailyRate: rate.dailyRate || 0,
-        nightRate: rate.nightRate || 0,
-        coordinationRate: rate.coordinationRate || 0,
-        isGross: rate.isGross !== undefined ? rate.isGross : true,
-        deductionSs: rate.deductionSs !== undefined ? rate.deductionSs * 100 : undefined,
-        deductionIrpf: (rate.deductionIrpf || 0) * 100,
-        deductionExtra: (rate.deductionExtra || 0) * 100,
+        rates: shiftRates,
+        isGross,
+        deductionSs,
+        deductionIrpf,
+        deductionExtra,
       });
     } else {
       rateForm.reset({
-        hourlyRate: 0,
-        dailyRate: 0,
-        nightRate: 0,
-        coordinationRate: 0,
+        rates: {},
         isGross: true,
         deductionSs: undefined,
-        deductionIrpf: 0,
-        deductionExtra: 0,
+        deductionIrpf: undefined,
+        deductionExtra: undefined,
       });
     }
-  }, [rates, rateForm]);
+  }, [rates, rateForm, worklogDefinitions]);
 
   // Mutations
   const userMutation = useMutation({
@@ -231,14 +235,6 @@ export default function ProfilePage() {
     },
   });
 
-  const joinMutation = useMutation({
-    mutationFn: (companyId: string) => joinCompany(companyId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["availableCompanies"] });
-      toast({ title: "Request sent", description: "Wait for admin approval." });
-    },
-    onError: () => toast({ title: "Failed to join", variant: "destructive" }),
-  });
 
   const rateMutation = useMutation({
     mutationFn: (payload: any) => {
@@ -249,7 +245,13 @@ export default function ProfilePage() {
       toast({ title: "Rates updated" });
       queryClient.invalidateQueries({ queryKey: ["rates", selectedCompanyId] });
     },
-    onError: () => toast({ title: "Failed to update rates", variant: "destructive" }),
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to update rates", 
+        description: error.response?.data?.detail || "Make sure all values are correct.",
+        variant: "destructive" 
+      });
+    },
   });
 
   function onRateSubmit(data: RateFormValues) {
@@ -258,16 +260,24 @@ export default function ProfilePage() {
       return;
     }
 
+    const ratesConfig: Record<string, any> = {};
+    const shiftKeys = Object.keys(worklogDefinitions || {});
+    
+    for (const key of shiftKeys) {
+        ratesConfig[key] = {
+            base_rate: data.rates[key] || 0,
+            is_gross: data.isGross,
+            tax_overrides: {
+                ss: (data.deductionSs !== undefined && data.deductionSs !== null && !isNaN(data.deductionSs)) ? data.deductionSs / 100 : undefined,
+                irpf: (data.deductionIrpf !== undefined && data.deductionIrpf !== null && !isNaN(data.deductionIrpf)) ? data.deductionIrpf / 100 : undefined,
+                extra: (data.deductionExtra !== undefined && data.deductionExtra !== null && !isNaN(data.deductionExtra)) ? data.deductionExtra / 100 : undefined
+            }
+        };
+    }
+
     const payload = {
       companyId: selectedCompanyId,
-      hourlyRate: data.hourlyRate,
-      dailyRate: data.dailyRate,
-      nightRate: data.nightRate,
-      coordinationRate: data.coordinationRate,
-      isGross: data.isGross,
-      deductionSs: data.deductionSs !== undefined ? data.deductionSs / 100 : undefined,
-      deductionIrpf: data.deductionIrpf / 100,
-      deductionExtra: data.deductionExtra / 100
+      ...ratesConfig
     };
 
     rateMutation.mutate(payload);
@@ -429,13 +439,8 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
 
-        <Tabs defaultValue="rates">
-          <TabsList>
-            <TabsTrigger value="rates">Company Rates</TabsTrigger>
-            <TabsTrigger value="companies">Company Membership</TabsTrigger>
-          </TabsList>
+        <div className="space-y-6">
 
-          <TabsContent value="rates">
             {/* Rates Section */}
             <Card>
               <CardHeader>
@@ -443,81 +448,71 @@ export default function ProfilePage() {
                 <CardDescription>Manage your rates for each company.</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="mb-6">
-                  <Label className="mb-2 block">Select Company</Label>
-                  <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
-                    <SelectTrigger className="w-[280px]">
-                      <SelectValue placeholder="Select a company" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {myCompanies
-                        .map((company: Company) => (
-                          <SelectItem key={company.id} value={company.id}>
-                            {company.name}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {!user?.active_company_id && myCompanies.length > 1 && (
+                  <div className="mb-6">
+                    <Label className="mb-2 block">Select Company</Label>
+                    <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
+                      <SelectTrigger className="w-[280px]">
+                        <SelectValue placeholder="Select a company" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {myCompanies
+                          .map((company: Company) => (
+                            <SelectItem key={company.id} value={company.id}>
+                              {company.name}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {user?.active_company_id && currentCompany && (
+                  <div className="mb-6 flex items-center gap-2 px-4 py-3 bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900 rounded-lg">
+                    <Building2 className="h-5 w-5 text-indigo-600" />
+                    <div>
+                      <p className="text-sm font-medium text-indigo-900 dark:text-indigo-100">Gestionando tarifas para:</p>
+                      <p className="text-lg font-bold text-indigo-700 dark:text-indigo-400">{currentCompany.name}</p>
+                    </div>
+                  </div>
+                )}
 
                 <Form {...rateForm}>
                   <form className="space-y-8" onSubmit={rateForm.handleSubmit(onRateSubmit)}>
                     <div className="grid gap-4 md:grid-cols-2">
-                      {(!allowedRates || allowedRates.includes("hourly")) && (
+                      {Object.entries(worklogDefinitions || {}).map(([key, def]: [string, any]) => (
                         <FormField
+                          key={key}
                           control={rateForm.control}
-                          name="hourlyRate"
+                          name={`rates.${key}`}
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Hourly Rate (€/h)</FormLabel>
-                              <FormControl><Input type="number" {...field} /></FormControl>
+                              <FormLabel>Tarifa para {def.label} (€)</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  type="number" 
+                                  step="0.01" 
+                                  {...field} 
+                                  value={field.value ?? ""} 
+                                  onChange={e => field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value))} 
+                                />
+                              </FormControl>
+                              {def.is_range ? (
+                                <FormDescription>Se calculará por día</FormDescription>
+                              ) : def.unit === "fixed" ? (
+                                <FormDescription>Se calculará por evento fijo</FormDescription>
+                              ) : (
+                                <FormDescription>Se calculará por hora</FormDescription>
+                              )}
                               <FormMessage />
                             </FormItem>
                           )}
                         />
-                      )}
-
-                      {(!allowedRates || allowedRates.includes("night")) && (
-                        <FormField
-                          control={rateForm.control}
-                          name="nightRate"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Night Rate (€/night)</FormLabel>
-                              <FormControl><Input type="number" {...field} /></FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      )}
-
-                      {(!allowedRates || allowedRates.includes("daily")) && (
-                        <FormField
-                          control={rateForm.control}
-                          name="dailyRate"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Daily Rate (€/day)</FormLabel>
-                              <FormControl><Input type="number" {...field} /></FormControl>
-                              <FormDescription>Used for Tutorial/Days</FormDescription>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      )}
-
-                      {(!allowedRates || allowedRates.includes("coordination")) && (
-                        <FormField
-                          control={rateForm.control}
-                          name="coordinationRate"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Coordination Rate (€)</FormLabel>
-                              <FormControl><Input type="number" {...field} /></FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
+                      ))}
+                      {Object.keys(worklogDefinitions || {}).length === 0 && (
+                        <div className="col-span-2 text-center p-4 text-muted-foreground border rounded-md">
+                          La empresa no ha definido tipos de turnos todavía.
+                        </div>
                       )}
                     </div>
 
@@ -556,14 +551,14 @@ export default function ProfilePage() {
                                   <Input
                                     type="number"
                                     step="0.0001"
-                                    placeholder={(currentCompany as any)?.social_security_deduction ? `Default: ${((currentCompany as any).social_security_deduction * 100).toFixed(2)}` : "0"}
+                                    placeholder={(currentCompany as any)?.taxConfig?.social_security ? `Default: ${((currentCompany as any).taxConfig.social_security * 100).toFixed(2)}` : "0"}
                                     {...field}
                                     value={field.value ?? ""}
                                     onChange={e => field.onChange(e.target.value === "" ? undefined : Number(e.target.value))}
                                   />
                                 </FormControl>
                                 <FormDescription>
-                                  Leave empty to use Company Default ({(currentCompany as any)?.social_security_deduction ? ((currentCompany as any).social_security_deduction * 100).toFixed(2) : 0}%)
+                                  Leave empty to use Company Default ({(currentCompany as any)?.taxConfig?.social_security ? ((currentCompany as any).taxConfig.social_security * 100).toFixed(2) : 0}%)
                                 </FormDescription>
                                 <FormMessage />
                               </FormItem>
@@ -575,7 +570,15 @@ export default function ProfilePage() {
                             render={({ field }) => (
                               <FormItem>
                                 <FormLabel>IRPF (%)</FormLabel>
-                                <FormControl><Input type="number" step="0.0001" {...field} /></FormControl>
+                                <FormControl>
+                                  <Input 
+                                    type="number" 
+                                    step="0.01" 
+                                    {...field} 
+                                    value={field.value ?? ""} 
+                                    onChange={e => field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value))} 
+                                  />
+                                </FormControl>
                                 <FormMessage />
                               </FormItem>
                             )}
@@ -586,7 +589,15 @@ export default function ProfilePage() {
                             render={({ field }) => (
                               <FormItem>
                                 <FormLabel>Extra (%)</FormLabel>
-                                <FormControl><Input type="number" step="0.0001" {...field} /></FormControl>
+                                <FormControl>
+                                  <Input 
+                                    type="number" 
+                                    step="0.01" 
+                                    {...field} 
+                                    value={field.value ?? ""} 
+                                    onChange={e => field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value))} 
+                                  />
+                                </FormControl>
                                 <FormMessage />
                               </FormItem>
                             )}
@@ -603,38 +614,8 @@ export default function ProfilePage() {
                 </Form>
               </CardContent>
             </Card>
-          </TabsContent>
 
-          <TabsContent value="companies">
-            <Card>
-              <CardHeader>
-                <CardTitle>Available Companies</CardTitle>
-                <CardDescription>Join new companies to log work.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {availableCompanies.length === 0 ? (
-                  <p className="text-muted-foreground">No new companies available.</p>
-                ) : (
-                  <div className="grid gap-4">
-                    {availableCompanies.map((c: any) => (
-                      <div key={c.id} className="flex items-center justify-between border p-4 rounded-md">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{c.name}</span>
-                          {c.membership_status === 'rejected' && (
-                            <Badge variant="destructive">Rejected</Badge>
-                          )}
-                        </div>
-                        <Button size="sm" onClick={() => joinMutation.mutate(c.id)} disabled={joinMutation.isPending}>
-                          {c.membership_status === 'rejected' ? 'Request to Re-join' : 'Request to Join'}
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+        </div>
       </div>
     </div>
   );

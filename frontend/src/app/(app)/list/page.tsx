@@ -3,7 +3,8 @@
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
 import { getUserRates } from "@/lib/api/settings";
-import type { WorkLog, UserCompanyRate } from "@/lib/types";
+import { getMyCompanies } from "@/lib/api/companies";
+import type { WorkLog, UserCompanyRate, Company } from "@/lib/types";
 import {
   Table,
   TableBody,
@@ -31,12 +32,14 @@ export default function ListPage() {
   const targetUserId = searchParams.get('userId');
 
   const [editingLog, setEditingLog] = useState<WorkLog | null>(null);
+  const [applyToGroup, setApplyToGroup] = useState(false);
 
   // ... (existing code)
 
   const [selectedLog, setSelectedLog] = useState<WorkLog | null>(null);
   const [workLogs, setWorkLogs] = useState<WorkLog[]>([]);
   const [userRates, setUserRates] = useState<UserCompanyRate[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
   const [isLoadingLogs, setIsLoadingLogs] = useState(true);
 
   const currentCompanyId = searchParams.get('companyId');
@@ -66,10 +69,11 @@ export default function ListPage() {
     }
   };
 
-  const fetchSettings = async () => {
+   const fetchSettings = async () => {
     try {
-      const rates = await getUserRates();
+      const [rates, comps] = await Promise.all([getUserRates(), getMyCompanies()]);
       setUserRates(rates);
+      setCompanies(comps);
     } catch (error) {
       console.error("Error fetching rates", error);
     }
@@ -111,7 +115,7 @@ export default function ListPage() {
       const { from, to } = filters.date || {};
       if (from || to) {
         result = result.filter(log => {
-          const dateStr = log.type === 'tutorial' ? log.startDate : log.date;
+          const dateStr = log.startDate;
           if (!dateStr) return false;
           const logDate = parseISO(dateStr);
           if (from && logDate < from) return false;
@@ -128,8 +132,8 @@ export default function ListPage() {
     // Default Sort (Date Desc) if no config
     if (!sortConfig) {
       result.sort((a, b) => {
-        const dateA = a.type === 'tutorial' ? a.startDate : a.date;
-        const dateB = b.type === 'tutorial' ? b.startDate : b.date;
+        const dateA = a.startDate;
+        const dateB = b.startDate;
         if (!dateA || !dateB) return 0;
         return parseISO(dateB).getTime() - parseISO(dateA).getTime();
       });
@@ -144,8 +148,8 @@ export default function ListPage() {
             bVal = b.type;
             break;
           case 'date':
-            aVal = a.type === 'tutorial' ? a.startDate : a.date;
-            bVal = b.type === 'tutorial' ? b.startDate : b.date;
+            aVal = a.startDate;
+            bVal = b.startDate;
             break;
           case 'client':
             aVal = a.client || "";
@@ -172,8 +176,8 @@ export default function ListPage() {
             }
             break;
           case 'amount':
-            aVal = Number(a.amount) || 0;
-            bVal = Number(b.amount) || 0;
+            aVal = Number(a.netAmount || a.grossAmount) || 0;
+            bVal = Number(b.netAmount || b.grossAmount) || 0;
             break;
           default:
             aVal = "";
@@ -188,6 +192,23 @@ export default function ListPage() {
 
     return result;
   }, [workLogs, filters, sortConfig]);
+
+  const activeCompanyId = currentCompanyId || user?.active_company_id;
+  const activeCompany = useMemo(() => {
+    if (!activeCompanyId) return null;
+    return companies.find(c => c.id === activeCompanyId);
+  }, [companies, activeCompanyId]);
+
+  const dynamicFields = useMemo(() => {
+    if (!activeCompany?.worklogDefinitions) return [];
+    const fields = new Set<string>();
+    Object.values(activeCompany.worklogDefinitions).forEach((def: any) => {
+      if (def.fields && Array.isArray(def.fields)) {
+        def.fields.forEach((f: string) => fields.add(f));
+      }
+    });
+    return Array.from(fields).filter((f: string) => f !== 'description');
+  }, [activeCompany]);
 
   const handleSort = (key: string) => {
     setSortConfig(current => {
@@ -249,9 +270,15 @@ export default function ListPage() {
         <UserCreateWorkLogDialog
           user={{ id: user.id }}
           open={!!editingLog}
-          onOpenChange={(open) => !open && setEditingLog(null)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setEditingLog(null);
+              setApplyToGroup(false);
+            }
+          }}
           logToEdit={editingLog}
-          onLogUpdate={() => { handleLogUpdate(); setEditingLog(null); }}
+          applyToGroup={applyToGroup}
+          onLogUpdate={() => { handleLogUpdate(); setEditingLog(null); setApplyToGroup(false); }}
         />
       )}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -306,6 +333,9 @@ export default function ListPage() {
                   ) : <ArrowUpDown className="h-4 w-4 text-slate-50/50" />}
                 </div>
               </TableHead>
+              {dynamicFields.map(field => (
+                <TableHead key={field} className="text-slate-50 capitalize hidden lg:table-cell">{field}</TableHead>
+              ))}
               <TableHead className="text-slate-50">
                 Flags
               </TableHead>
@@ -379,8 +409,8 @@ export default function ListPage() {
                         <span className="font-medium whitespace-nowrap">
                           {log.type === 'tutorial' && log.startDate && log.endDate
                             ? `${format(parseISO(log.startDate), "dd/MM/yyyy")} - ${format(parseISO(log.endDate), "dd/MM/yyyy")}`
-                            : log.date
-                              ? format(parseISO(log.date), "dd/MM/yyyy")
+                            : log.startDate
+                              ? format(parseISO(log.startDate), "dd/MM/yyyy")
                               : "-"}
                         </span>
                         {log.type === 'particular' && log.startTime && log.endTime && (
@@ -396,6 +426,11 @@ export default function ListPage() {
                         <span className="truncate">{log.client || '-'}</span>
                       </div>
                     </TableCell>
+                    {dynamicFields.map(field => (
+                      <TableCell key={field} className="py-2 hidden lg:table-cell truncate max-w-[100px]" title={log.extraData?.datos?.[field] || '-'}>
+                        {log.extraData?.datos?.[field] || '-'}
+                      </TableCell>
+                    ))}
                     <TableCell className="py-2">
                       <div className="flex gap-1">
                         {log.hasCoordination && (
@@ -420,7 +455,7 @@ export default function ListPage() {
                     <TableCell className="py-2">
                       {(() => {
                         const rate = userRates.find((r: any) => r.companyId === log.companyId);
-                        if (!rate) return log.amount ? `€${Number(log.amount).toFixed(2)}` : '-';
+                        if (!rate) return (log.netAmount || log.grossAmount) ? `€${Number(log.netAmount || log.grossAmount).toFixed(2)}` : '-';
 
                         let totalGross = 0;
                         if (log.type === 'tutorial' && log.startDate && log.endDate) {
@@ -490,6 +525,11 @@ export default function ListPage() {
             ? userRates.find(r => r.companyId === selectedLog.companyId) || null
             : null
         }
+        onEdit={(log, group) => {
+          setApplyToGroup(group);
+          setSelectedLog(null);
+          setEditingLog(log);
+        }}
       />
     </div>
   );

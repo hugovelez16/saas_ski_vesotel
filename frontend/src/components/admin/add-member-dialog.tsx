@@ -83,14 +83,11 @@ export function AddMemberDialog({ companyId, companyName, existingMembers = [] }
                 description: `User added to ${companyName} successfully.`,
             });
         },
-        onError: (error) => {
-            let title = "Error";
-            if (error instanceof Error) {
-                title = "Failed to add user";
-            }
+        onError: (error: any) => {
+            const detail = error.response?.data?.detail || error.message || "Ensure the user is selected correctly.";
             toast({
-                title: title,
-                description: "Ensure the user is selected correctly.",
+                title: "Error adding user",
+                description: Array.isArray(detail) ? JSON.stringify(detail) : String(detail),
                 variant: "destructive",
             });
         },
