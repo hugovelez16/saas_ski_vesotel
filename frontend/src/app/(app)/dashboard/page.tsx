@@ -1,5 +1,6 @@
+"use client";
 export const dynamic = "force-dynamic";
-"use client"
+
 import { useAuth } from "@/context/AuthContext"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Loader2, ChevronLeft, ChevronRight } from "lucide-react"

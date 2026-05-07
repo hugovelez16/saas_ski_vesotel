@@ -1,5 +1,6 @@
-export const dynamic = "force-dynamic";
 "use client";
+export const dynamic = "force-dynamic";
+
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getUsers, getUser, getUserCompanies } from "@/lib/api/users";

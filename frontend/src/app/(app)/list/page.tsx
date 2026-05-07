@@ -1,5 +1,6 @@
-export const dynamic = "force-dynamic";
 "use client";
+export const dynamic = "force-dynamic";
+
 
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
