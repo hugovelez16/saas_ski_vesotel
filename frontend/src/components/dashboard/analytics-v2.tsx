@@ -27,7 +27,7 @@ export function AnalyticsV2({ workLogs, selectedDate }: AnalyticsV3Props) {
 
             const income = workLogs
                 .filter(log => {
-                    const d = new Date(log.date || log.startDate || log.created_at);
+                    const d = new Date(log.date || log.startDate || log.createdAt);
                     return d >= monthStart && d <= monthEnd;
                 })
                 .reduce((acc, log) => acc + (Number(log.amount) || 0), 0);
@@ -56,7 +56,7 @@ export function AnalyticsV2({ workLogs, selectedDate }: AnalyticsV3Props) {
 
             const income = workLogs
                 .filter(log => {
-                    const d = new Date(log.date || log.startDate || log.created_at);
+                    const d = new Date(log.date || log.startDate || log.createdAt);
                     return d >= weekStart && d <= weekEnd;
                 })
                 .reduce((acc, log) => acc + (Number(log.amount) || 0), 0);
@@ -86,7 +86,7 @@ export function AnalyticsV2({ workLogs, selectedDate }: AnalyticsV3Props) {
                 .filter(log => {
                     if (log.type === 'particular') {
                         // For particular: check if log.date matches this day
-                        const d = new Date(log.date || log.created_at);
+                        const d = new Date(log.date || log.createdAt);
                         return isSameDay(d, day);
                     } else if (log.type === 'tutorial') {
                         // For tutorial: check if this day falls within startDate-endDate range

@@ -119,8 +119,8 @@ export function ReportGenerationDialog({ companies = [], children, open, onOpenC
 
             // Sort by date old -> new
             logs.sort((a, b) => {
-                const dateA = a.date || a.startDate || a.created_at;
-                const dateB = b.date || b.startDate || b.created_at;
+                const dateA = a.date || a.startDate || a.createdAt;
+                const dateB = b.date || b.startDate || b.createdAt;
                 return new Date(dateA).getTime() - new Date(dateB).getTime();
             });
 

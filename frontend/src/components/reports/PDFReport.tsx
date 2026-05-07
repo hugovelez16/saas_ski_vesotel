@@ -392,12 +392,12 @@ export const PDFReport = ({ workLogs, companies, title, subtitle, dateRange }: P
     const groupedLogs = useMemo(() => {
         const groups = new Map<string, WorkLog[]>();
         const sorted = [...workLogs].sort((a, b) => {
-            const dateA = new Date(a.date || a.startDate || a.created_at);
-            const dateB = new Date(b.date || b.startDate || b.created_at);
+            const dateA = new Date(a.date || a.startDate || a.createdAt);
+            const dateB = new Date(b.date || b.startDate || b.createdAt);
             return dateA.getTime() - dateB.getTime();
         });
         sorted.forEach(log => {
-            const d = new Date(log.date || log.startDate || log.created_at);
+            const d = new Date(log.date || log.startDate || log.createdAt);
             const key = format(d, 'MMMM yyyy');
             if (!groups.has(key)) groups.set(key, []);
             groups.get(key)!.push(log);

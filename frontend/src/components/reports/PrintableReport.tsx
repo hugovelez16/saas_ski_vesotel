@@ -128,13 +128,13 @@ export function PrintableReport({ workLogs, companies, title, subtitle, dateRang
 
         // Sort first
         const sorted = [...workLogs].sort((a, b) => {
-            const dateA = new Date(a.date || a.startDate || a.created_at);
-            const dateB = new Date(b.date || b.startDate || b.created_at);
+            const dateA = new Date(a.date || a.startDate || a.createdAt);
+            const dateB = new Date(b.date || b.startDate || b.createdAt);
             return dateA.getTime() - dateB.getTime();
         });
 
         sorted.forEach(log => {
-            const d = new Date(log.date || log.startDate || log.created_at);
+            const d = new Date(log.date || log.startDate || log.createdAt);
             const key = format(d, 'MMMM yyyy'); // e.g. "January 2024"
             if (!groups.has(key)) {
                 groups.set(key, []);

@@ -16,8 +16,8 @@ export function OverviewV1({ workLogs }: OverviewV1Props) {
 
     // Sort by date desc
     const recentLogs = [...workLogs].sort((a, b) => {
-        const dateA = new Date(a.date || a.startDate || a.created_at);
-        const dateB = new Date(b.date || b.startDate || b.created_at);
+        const dateA = new Date(a.date || a.startDate || a.createdAt);
+        const dateB = new Date(b.date || b.startDate || b.createdAt);
         return dateB.getTime() - dateA.getTime();
     }).slice(0, 10);
 
