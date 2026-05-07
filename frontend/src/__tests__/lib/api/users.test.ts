@@ -23,7 +23,6 @@ import {
     getUserSessions,
     revokeUserSession,
     impersonateUser,
-    updateUserRatesAdmin,
     getNotifications,
     markNotificationRead,
     resetPasswordEmail,
@@ -137,11 +136,6 @@ describe('Users API Client', () => {
             expect(result.access_token).toBe('tok');
         });
 
-        it('updateUserRatesAdmin should PUT /users/:id/rates', async () => {
-            (mockedApi.put as any).mockResolvedValue({ data: {} });
-            await updateUserRatesAdmin('u-1', { hourlyRate: 20 });
-            expect(mockedApi.put).toHaveBeenCalledWith('/users/u-1/rates', { hourlyRate: 20 });
-        });
 
         it('resetPasswordEmail should POST /users/:id/reset-password-email', async () => {
             (mockedApi.post as any).mockResolvedValue({ data: {} });

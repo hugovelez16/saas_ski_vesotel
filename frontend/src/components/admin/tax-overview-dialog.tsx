@@ -2,7 +2,8 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { getCompanyRates } from "@/lib/api/companies";
-import { UserCompanyRate } from "@/lib/types";
+import { CompanyMember } from "@/lib/types";
+import { mapMemberToLegacyRate } from "@/lib/utils/rates";
 import {
     Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger
 } from "@/components/ui/dialog";
@@ -16,7 +17,7 @@ interface TaxOverviewDialogProps {
 }
 
 export function TaxOverviewDialog({ companyId, companyName }: TaxOverviewDialogProps) {
-    const { data: rates = [], isLoading } = useQuery({
+    const { data: members = [], isLoading } = useQuery({
         queryKey: ["companyRates", companyId],
         queryFn: () => getCompanyRates(companyId),
     });
@@ -25,8 +26,6 @@ export function TaxOverviewDialog({ companyId, companyName }: TaxOverviewDialogP
         if (val === undefined || val === null) return "-";
         return `${(val * 100).toFixed(2)}%`;
     };
-
-    // Check if rates is array. API might return null if empty? default [] handles it.
 
     return (
         <Dialog>
@@ -57,15 +56,16 @@ export function TaxOverviewDialog({ companyId, companyName }: TaxOverviewDialogP
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {rates.length === 0 ? (
+                                {members.length === 0 ? (
                                     <TableRow>
                                         <TableCell colSpan={5} className="text-center h-24 text-muted-foreground">No rates configured yet.</TableCell>
                                     </TableRow>
                                 ) : (
-                                    rates.map((rate: UserCompanyRate) => {
-                                        const userName = rate.user ? `${rate.user.first_name || ''} ${rate.user.last_name || ''}` : 'Unknown User';
+                                    members.map((member: CompanyMember) => {
+                                        const rate = mapMemberToLegacyRate(member);
+                                        const userName = member.user ? `${member.user.first_name || ''} ${member.user.last_name || ''}` : 'Unknown User';
                                         return (
-                                            <TableRow key={rate.userId}>
+                                            <TableRow key={member.userId}>
                                                 <TableCell className="font-medium">{userName}</TableCell>
                                                 <TableCell>
                                                     {rate.isGross ?

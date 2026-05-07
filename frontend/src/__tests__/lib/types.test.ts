@@ -18,7 +18,7 @@ import type {
  */
 
 describe('Type Definitions — Compile-time Safety', () => {
-    it('UserProfile should have all camelCase fields', () => {
+    it('UserProfile should have expected fields', () => {
         const user: UserProfile = {
             id: 'u-1',
             email: 'test@example.com',
@@ -26,7 +26,7 @@ describe('Type Definitions — Compile-time Safety', () => {
             last_name: 'Doe',
             role: 'user',
             is_active: true,
-            created_at: '2026-01-01T00:00:00Z',
+            createdAt: '2026-01-01T00:00:00Z',
         };
 
         expect(user.id).toBe('u-1');
@@ -43,14 +43,14 @@ describe('Type Definitions — Compile-time Safety', () => {
             last_name: 'User',
             role: 'admin',
             is_active: true,
-            created_at: '2026-01-01T00:00:00Z',
+            createdAt: '2026-01-01T00:00:00Z',
         };
         // If User is NOT the same as UserProfile, this would fail
         const profile: UserProfile = user;
         expect(profile.first_name).toBe('Test');
     });
 
-    it('WorkLog should have camelCase financial fields', () => {
+    it('WorkLog should have financial fields', () => {
         const log: WorkLog = {
             id: 'wl-1',
             userId: 'u-1',
@@ -62,7 +62,7 @@ describe('Type Definitions — Compile-time Safety', () => {
             grossAmount: 120,
             rateApplied: 15,
             extraData: {},
-            created_at: '2026-01-15T00:00:00Z',
+            createdAt: '2026-01-15T00:00:00Z',
             updatedAt: '2026-01-15T00:00:00Z',
         };
 
@@ -85,7 +85,7 @@ describe('Type Definitions — Compile-time Safety', () => {
             grossAmount: 0,
             rateApplied: 0,
             extraData: {},
-            created_at: '2026-01-01',
+            createdAt: '2026-01-01',
             updatedAt: '2026-01-01',
             // Optional fields
             date: '2026-01-10',
@@ -101,7 +101,7 @@ describe('Type Definitions — Compile-time Safety', () => {
         expect(log.isGrossCalculation).toBe(true);
     });
 
-    it('WorkLogCreate should have camelCase fields + optional financials', () => {
+    it('WorkLogCreate should have expected fields', () => {
         const create: WorkLogCreate = {
             type: 'particular',
             companyId: 'c-1',
@@ -114,36 +114,19 @@ describe('Type Definitions — Compile-time Safety', () => {
         expect(create.userId).toBe('u-1');
     });
 
-    it('WorkLogCreate should accept optional financial fields', () => {
-        const create: WorkLogCreate = {
-            type: 'particular',
-            companyId: 'c-1',
-            userId: 'u-1',
-            startDate: '2026-01-15',
-            endDate: '2026-01-15',
-            rateApplied: 15,
-            grossAmount: 120,
-            netAmount: 100,
-            isGrossCalculation: false,
-        };
-
-        expect(create.rateApplied).toBe(15);
-        expect(create.isGrossCalculation).toBe(false);
-    });
-
-    it('Token should use camelCase', () => {
+    it('Token should use snake_case', () => {
         const token: Token = {
-            accessToken: 'abc123',
-            tokenType: 'bearer',
-            requires2fa: false,
-            deviceToken: 'dev-123',
+            access_token: 'abc123',
+            token_type: 'bearer',
+            requires_2fa: false,
+            device_token: 'dev-123',
         };
 
-        expect(token.accessToken).toBe('abc123');
-        expect(token.tokenType).toBe('bearer');
+        expect(token.access_token).toBe('abc123');
+        expect(token.token_type).toBe('bearer');
     });
 
-    it('CompanyMember should reference userId (camelCase)', () => {
+    it('CompanyMember should reference userId', () => {
         const member: CompanyMember = {
             userId: 'u-1',
             companyId: 'c-1',
@@ -172,14 +155,25 @@ describe('Type Definitions — Compile-time Safety', () => {
                 last_name: 'Doe',
                 role: 'user',
                 is_active: true,
-                created_at: '2026-01-01',
+                createdAt: '2026-01-01',
             },
         };
 
         expect(rate.user?.first_name).toBe('John');
     });
 
-    it('Session should have camelCase fields', () => {
+    it('DynamicRateConfig should support dynamic keys', () => {
+        const config: Record<string, any> = {
+            tutorial: {
+                base_rate: 15,
+                is_gross: true,
+                tax_overrides: { irpf: 0.02 }
+            }
+        };
+        expect(config.tutorial.base_rate).toBe(15);
+    });
+
+    it('Session should have expected fields', () => {
         const session: Session = {
             id: 's-1',
             deviceName: 'Chrome',

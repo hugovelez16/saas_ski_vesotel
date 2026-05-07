@@ -542,6 +542,13 @@ def join_company(db: Session, user_id: str, company_id: str):
          _invalidate_company_rates(company_id)
          return new_member
     
+    # Healing: If existing member has NULL rates_config, fix it
+    if member.rates_config is None:
+        member.rates_config = {}
+        db.commit()
+        db.refresh(member)
+        _invalidate_company_rates(company_id)
+    
     return member
 
 def get_joinable_companies(db: Session, user_id: str):
@@ -642,6 +649,9 @@ def update_company_member(db: Session, company_id: Any, user_id: Any, member_upd
         update_data = member_update.model_dump(exclude_unset=True, by_alias=False)
         
         for key, value in update_data.items():
+            if value is None and key in ["role", "is_active"]:
+                continue # Hardening: do not allow setting role or is_active to NULL
+
             if key == "role" and value:
                 try:
                     setattr(member, key, models.CompanyRole(value))
@@ -706,6 +716,9 @@ def update_user(db: Session, user_id: Any, user: schemas.UserUpdate):
         # Use model_dump(exclude_unset=True) to get only provided fields
         update_data = user.model_dump(exclude_unset=True)
         for key, value in update_data.items():
+            if value is None and key in ["role", "is_active"]:
+                continue # Hardening: do not allow setting role or is_active to NULL
+
             if key == "role" and value:
                 # Convert string role to UserRole enum
                 try:

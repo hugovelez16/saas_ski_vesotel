@@ -70,18 +70,21 @@ export default function ReportsPage() {
     const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
 
     // Effect to select default company
-    useMemo(() => {
+    useEffect(() => {
         if (accessibleCompanies.length > 0 && !selectedCompanyId) {
-            if (user?.default_company_id) {
-                const exists = accessibleCompanies.find(c => c.id === user.default_company_id);
+            // Priority: Active Context > User Default > First Available
+            const targetId = user?.active_company_id || user?.default_company_id;
+            
+            if (targetId) {
+                const exists = accessibleCompanies.find(c => c.id === targetId);
                 if (exists) {
-                    setSelectedCompanyId(user.default_company_id);
+                    setSelectedCompanyId(targetId);
                     return;
                 }
             }
             setSelectedCompanyId(accessibleCompanies[0].id);
         }
-    }, [accessibleCompanies, selectedCompanyId, user?.default_company_id]);
+    }, [accessibleCompanies, selectedCompanyId, user?.active_company_id, user?.default_company_id]);
 
     // Fetch members/users
     // If Admin and NO company selected -> Get ALL Users
@@ -360,9 +363,9 @@ export default function ReportsPage() {
                 const { PDFReport } = await import("@/components/reports/PDFReport");
 
                 logs.sort((a, b) => {
-                    const dateA = a.date || a.startDate || a.created_at;
-                    const dateB = b.date || b.startDate || b.created_at;
-                    return new Date(dateA).getTime() - new Date(dateB).getTime();
+                    const dateA = a.date || a.startDate || a.createdAt;
+                    const dateB = b.date || b.startDate || b.createdAt;
+                    return new Date(dateA as string).getTime() - new Date(dateB as string).getTime();
                 });
 
                 blob = await pdf(
@@ -608,7 +611,7 @@ export default function ReportsPage() {
                         {companies.length > 0 && (
                             <div className="space-y-2">
                                 <Label>Empresa</Label>
-                                <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
+                                <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId} disabled={!!user?.active_company_id}>
                                     <SelectTrigger><SelectValue placeholder="Seleccionar empresa" /></SelectTrigger>
                                     <SelectContent>
                                         {accessibleCompanies.map(c => (

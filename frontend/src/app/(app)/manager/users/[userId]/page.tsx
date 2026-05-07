@@ -20,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { User, WorkLog } from "@/lib/types";
 import { OverviewV3 } from "@/components/dashboard/overview-v2";
 import { AnalyticsV2 as AnalyticsV3 } from "@/components/dashboard/analytics-v2";
+import { mapMemberToLegacyRate } from "@/lib/utils/rates";
 
 export default function ManagerUserDetailsPage({ params }: { params: Promise<{ userId: string }> }) {
     const { userId } = use(params);
@@ -68,9 +69,9 @@ export default function ManagerUserDetailsPage({ params }: { params: Promise<{ u
         enabled: !!user
     });
 
-    const { data: rates = [] } = useQuery({
-        queryFn: () => getUserCompanies(userId).then(companies => companies.map((c: any) => c.ratesConfig).filter(Boolean)),
-        queryKey: ["userRates", userId],
+    const { data: memberConfigs = [] } = useQuery({
+        queryFn: () => getUserCompanies(userId),
+        queryKey: ["userMemberConfigs", userId],
         enabled: !!user
     });
 
@@ -117,8 +118,8 @@ export default function ManagerUserDetailsPage({ params }: { params: Promise<{ u
 
     // Derived lists based on visibleCompanies
     const visibleRates = useMemo(() => {
-        return rates.filter((r: any) => visibleCompanies.some((c: any) => c.id === r.companyId));
-    }, [rates, visibleCompanies]);
+        return memberConfigs.filter((m: any) => visibleCompanies.some((c: any) => c.id === m.companyId));
+    }, [memberConfigs, visibleCompanies]);
 
     const visibleWorkLogs = useMemo(() => {
         return workLogs.filter((log: any) =>
@@ -129,19 +130,13 @@ export default function ManagerUserDetailsPage({ params }: { params: Promise<{ u
     // Effective User Settings Logic (Top Level)
     const effectiveUserSettings = useMemo(() => {
         if (!selectedLog) return null;
-        if (!rates || !companies) return null;
+        if (!memberConfigs || !companies) return null;
 
-        const rate = rates.find((r: any) => r.companyId === selectedLog.companyId);
-        const company = companies.find((c: any) => c.id === selectedLog.companyId);
+        const member = memberConfigs.find((m: any) => m.companyId === selectedLog.companyId);
+        if (!member) return null;
 
-        if (!rate) return null;
-
-        return {
-            ...rate,
-            deductionSs: rate.deductionSs ?? company?.social_security_deduction ?? 0,
-            deductionIrpf: rate.deductionIrpf ?? 0,
-        };
-    }, [selectedLog, rates, companies]);
+        return mapMemberToLegacyRate(member);
+    }, [selectedLog, memberConfigs, companies]);
 
     const filteredLogs = useMemo(() => {
         let result = [...workLogs];
@@ -199,8 +194,8 @@ export default function ManagerUserDetailsPage({ params }: { params: Promise<{ u
                         bVal = b.client || "";
                         break;
                     case 'created_at':
-                        aVal = a.created_at || "";
-                        bVal = b.created_at || "";
+                        aVal = a.createdAt || "";
+                        bVal = b.createdAt || "";
                         break;
                     default:
                         aVal = "";
@@ -346,7 +341,7 @@ export default function ManagerUserDetailsPage({ params }: { params: Promise<{ u
                             {user.is_active_worker && <Badge variant="secondary" className="text-xs border-green-200 bg-green-50 text-green-700">Worker</Badge>}
                             {user.is_manager && <Badge variant="secondary" className="text-xs border-blue-200 bg-blue-50 text-blue-700">Manager</Badge>}
                             <span className="text-xs text-muted-foreground flex items-center ml-2">
-                                <Calendar className="w-3 h-3 mr-1" /> Moved/Created: {user.created_at ? format(new Date(user.created_at), 'MMM d, yyyy') : 'N/A'}
+                                <Calendar className="w-3 h-3 mr-1" /> Moved/Created: {user.createdAt ? format(new Date(user.createdAt), 'MMM d, yyyy') : 'N/A'}
                             </span>
                         </div>
                     </div>
@@ -513,48 +508,45 @@ export default function ManagerUserDetailsPage({ params }: { params: Promise<{ u
                 <TabsContent value="rates" className="mt-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {visibleCompanies.map((company: any) => {
-                            const companyRate = visibleRates.find((r: any) => r.companyId === company.id);
-                            if (!companyRate) return null;
+                            const member = visibleRates.find((m: any) => m.companyId === company.id);
+                            if (!member || !member.ratesConfig) return null;
+
+                            const worklogDefs = company.worklogDefinitions || {};
+                            const firstRate = Object.values(member.ratesConfig)[0] as any;
 
                             return (
                                 <Card key={company.id} className="overflow-hidden border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-950/50 backdrop-blur-sm">
-                                    <div className="bg-slate-900 px-4 py-3 text-white flex items-center gap-2">
-                                        <Building2 className="h-5 w-5 text-indigo-400" />
-                                        <span className="font-bold">{company.name}</span>
+                                    <div className="bg-slate-900 px-4 py-3 text-white flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <Building2 className="h-5 w-5 text-indigo-400" />
+                                            <span className="font-bold">{company.name}</span>
+                                        </div>
                                     </div>
                                     <CardContent className="p-4 space-y-4">
                                         <div className="grid grid-cols-2 gap-4">
-                                            <div className="space-y-1">
-                                                <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Hora</p>
-                                                <p className="text-lg font-bold">€{Number(companyRate.hourlyRate || 0).toFixed(2)}</p>
-                                            </div>
-                                            <div className="space-y-1">
-                                                <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Día</p>
-                                                <p className="text-lg font-bold">€{Number(companyRate.dailyRate || 0).toFixed(2)}</p>
-                                            </div>
-                                            <div className="space-y-1">
-                                                <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Nocturnidad</p>
-                                                <p className="text-lg font-bold">€{Number(companyRate.nightRate || 0).toFixed(2)}</p>
-                                            </div>
-                                            <div className="space-y-1">
-                                                <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Coordinación</p>
-                                                <p className="text-lg font-bold">€{Number(companyRate.coordinationRate || 0).toFixed(2)}</p>
-                                            </div>
+                                            {Object.keys(member.ratesConfig).map((key) => (
+                                                <div key={key} className="space-y-1">
+                                                    <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold truncate" title={worklogDefs[key]?.label || key}>
+                                                        {worklogDefs[key]?.label || key}
+                                                    </p>
+                                                    <p className="text-lg font-bold">€{Number(member.ratesConfig[key]?.base_rate || 0).toFixed(2)}</p>
+                                                </div>
+                                            ))}
                                         </div>
 
                                         <div className="pt-4 border-t border-slate-200 dark:border-slate-800 grid grid-cols-3 gap-2">
                                             <div className="flex flex-col items-center p-2 rounded-lg bg-slate-100 dark:bg-slate-900">
                                                 <span className="text-[10px] text-muted-foreground uppercase font-bold">Base</span>
-                                                <Badge variant="outline" className="mt-1 text-[10px]">{companyRate.isGross ? "Bruto" : "Neto"}</Badge>
+                                                <Badge variant="outline" className="mt-1 text-[10px]">{firstRate?.is_gross ? "Bruto" : "Neto"}</Badge>
                                             </div>
                                             <div className="flex flex-col items-center p-2 rounded-lg bg-slate-100 dark:bg-slate-900">
                                                 <span className="text-[10px] text-muted-foreground uppercase font-bold">IRPF</span>
-                                                <span className="text-sm font-bold mt-1 text-red-500">{companyRate.deductionIrpf || 0}%</span>
+                                                <span className="text-sm font-bold mt-1 text-red-500">{(firstRate?.tax_overrides?.irpf || 0) * 100}%</span>
                                             </div>
                                             <div className="flex flex-col items-center p-2 rounded-lg bg-slate-100 dark:bg-slate-900">
                                                 <span className="text-[10px] text-muted-foreground uppercase font-bold">SS</span>
                                                 <span className="text-sm font-bold mt-1 text-blue-500">
-                                                    {companyRate.deductionSs !== undefined && companyRate.deductionSs !== null ? `${companyRate.deductionSs}%` : "Default"}
+                                                    {firstRate?.tax_overrides?.ss !== undefined && firstRate?.tax_overrides?.ss !== null ? `${firstRate.tax_overrides.ss * 100}%` : "Default"}
                                                 </span>
                                             </div>
                                         </div>

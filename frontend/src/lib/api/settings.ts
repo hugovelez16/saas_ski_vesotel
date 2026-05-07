@@ -1,28 +1,24 @@
 import api from '../api';
-import { UserCompanyRate, CompanyWithMembers } from '@/lib/types';
+import { CompanyMember, CompanyWithMembers } from '@/lib/types';
 import { getCompaniesDetailed } from './companies';
 
-export const getUserRates = async (companyId?: string): Promise<UserCompanyRate[]> => {
+export const getUserRates = async (companyId?: string): Promise<CompanyMember[]> => {
     try {
         const companies = await getCompaniesDetailed();
-        const { data: user } = await api.get('/users/me'); // Need current user ID to match member
+        const { data: user } = await api.get('/users/me');
 
-        let ratesList: UserCompanyRate[] = [];
+        let membersList: CompanyMember[] = [];
 
         for (const company of companies) {
             if (companyId && company.id !== companyId) continue;
 
             const myMembership = company.members?.find(m => m.userId === user.id);
-            if (myMembership && myMembership.ratesConfig) {
-                ratesList.push({
-                    company_id: company.id,
-                    user_id: user.id,
-                    ...myMembership.ratesConfig
-                } as unknown as UserCompanyRate); // Cast based on what UI expects
+            if (myMembership) {
+                membersList.push(myMembership);
             }
         }
 
-        return ratesList;
+        return membersList;
     } catch (e) {
         console.warn("Failed to fetch granular rates from detailed endpoint", e);
         return [];

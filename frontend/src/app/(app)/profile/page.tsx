@@ -42,7 +42,7 @@ import { getUserRates, updateUserRates, getCompanies } from "@/lib/api/settings"
 import { getMyCompanies } from "@/lib/api/companies";
 import { updateMe, changePassword } from "@/lib/api/users";
 import { useAuth } from "@/context/AuthContext";
-import { Company, UserCompanyRate } from "@/lib/types";
+import { Company, CompanyMember } from "@/lib/types";
 
 // User Info Form
 const userFormSchema = z.object({
@@ -95,7 +95,7 @@ export default function ProfilePage() {
     } else if (!selectedCompanyId && myCompanies.length > 0) {
       setSelectedCompanyId(myCompanies[0].id);
     }
-  }, [user?.active_company_id, user?.default_company_id, myCompanies]);
+  }, [user?.active_company_id, user?.default_company_id, myCompanies.length]);
 
   const currentCompany = myCompanies.find((c: Company) => c.id === selectedCompanyId);
   const companySettings = currentCompany?.settings || {};
@@ -146,12 +146,13 @@ export default function ProfilePage() {
         default_company_id: user.default_company_id || "",
       });
     }
-  }, [user, userForm]);
+  }, [user?.id, userForm]);
 
   // Sync rate form
   useEffect(() => {
     if (rates && rates.length > 0) {
-      const rateConfig = rates[0] as any;
+      const member = rates[0] as CompanyMember;
+      const ratesConfig = member.ratesConfig || {};
       
       let isGross = true;
       let deductionSs: number | undefined = undefined;
@@ -164,7 +165,7 @@ export default function ProfilePage() {
       let foundTaxes = false;
       
       for (const key of shiftKeys) {
-         const shiftData = rateConfig[key];
+         const shiftData = ratesConfig[key] as any;
          if (shiftData && typeof shiftData === 'object') {
              shiftRates[key] = shiftData.base_rate || 0;
              if (!foundTaxes) {
@@ -179,14 +180,6 @@ export default function ProfilePage() {
          } else {
              shiftRates[key] = 0;
          }
-      }
-
-      // Legacy fallback if they have old flat data and no new format was found
-      if (!foundTaxes && rateConfig.isGross !== undefined) {
-         isGross = rateConfig.isGross;
-         deductionSs = rateConfig.deductionSs !== undefined && rateConfig.deductionSs !== null ? rateConfig.deductionSs * 100 : undefined;
-         deductionIrpf = (rateConfig.deductionIrpf !== undefined && rateConfig.deductionIrpf !== null) ? rateConfig.deductionIrpf * 100 : undefined;
-         deductionExtra = (rateConfig.deductionExtra !== undefined && rateConfig.deductionExtra !== null) ? rateConfig.deductionExtra * 100 : undefined;
       }
 
       rateForm.reset({
@@ -205,7 +198,7 @@ export default function ProfilePage() {
         deductionExtra: undefined,
       });
     }
-  }, [rates, rateForm, worklogDefinitions]);
+  }, [rates, rateForm, JSON.stringify(worklogDefinitions)]);
 
   // Mutations
   const userMutation = useMutation({
@@ -345,11 +338,11 @@ export default function ProfilePage() {
                   name="default_company_id"
                   render={({ field }) => (
                     <FormItem className="md:col-span-2">
-                      <FormLabel>Default Company</FormLabel>
+                      <FormLabel>Empresa de Inicio (Login)</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value || ""} disabled={myCompanies.length === 0}>
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select default company" />
+                            <SelectValue placeholder="Seleccionar empresa de inicio" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
@@ -360,7 +353,7 @@ export default function ProfilePage() {
                           ))}
                         </SelectContent>
                       </Select>
-                      <FormDescription>This company will be selected by default when adding a work log.</FormDescription>
+                      <FormDescription>Esta empresa se seleccionará automáticamente al iniciar sesión si no eliges otra.</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}

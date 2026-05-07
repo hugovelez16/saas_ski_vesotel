@@ -74,6 +74,18 @@ export interface CompanySettings {
     input_mode?: 'manual_single' | 'timer' | 'bulk';
 }
 
+export interface DynamicRateEntry {
+    base_rate: number;
+    is_gross: boolean;
+    tax_overrides: {
+        ss?: number | null;
+        irpf?: number | null;
+        extra?: number | null;
+    };
+}
+
+export type DynamicRateConfig = Record<string, DynamicRateEntry>;
+
 /**
  * Company Member Interface
  */
@@ -83,7 +95,7 @@ export interface CompanyMember {
     role: string;
     is_active: boolean;
     status?: string;
-    ratesConfig?: Record<string, any>;
+    ratesConfig?: DynamicRateConfig | null;
     settings?: Record<string, any>;
     joinedAt: string;
     user?: UserProfile;
@@ -196,7 +208,8 @@ export interface Session {
 }
 
 /**
- * Master Admin Types
+ * @deprecated Use CompanyMember.ratesConfig instead for the new SaaS dynamic structure.
+ * This remains for legacy components during migration.
  */
 export interface UserCompanyRate {
     userId: string;

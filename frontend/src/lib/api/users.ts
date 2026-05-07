@@ -72,10 +72,6 @@ export const impersonateUser = async (userId: string): Promise<Token> => {
     return response.data;
 };
 
-export const updateUserRatesAdmin = async (userId: string, data: any): Promise<any> => {
-    const response = await api.put(`/users/${userId}/rates`, data);
-    return response.data;
-};
 
 export const getNotifications = async (): Promise<any[]> => {
     const response = await api.get("/users/me/notifications");

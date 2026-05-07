@@ -61,35 +61,11 @@ export function WorkLogForm({ formData, setFormData, logType, setLogType, compan
 
     useEffect(() => {
         if (companies.length > 0 && !formData.companyId) {
-            let defaultId = "";
+            // SaaS Context Driven: Always prefer active company from JWT context
+            const targetId = user?.active_company_id || default_company_id || user?.default_company_id || companies[0].id;
             
-            // Priority: Active Context > User Default > Personal > First Available
-            if (user?.active_company_id) {
-                const found = companies.find(c => c.id === user.active_company_id);
-                if (found) defaultId = found.id;
-            }
-            
-            if (!defaultId && default_company_id) {
-                const found = companies.find(c => c.id === default_company_id);
-                if (found) defaultId = found.id;
-            }
-            
-            if (!defaultId && user?.default_company_id) {
-                const found = companies.find(c => c.id === user.default_company_id);
-                if (found) defaultId = found.id;
-            }
-            
-            if (!defaultId) {
-                const personal = companies.find(c => c.name === "Personal");
-                if (personal) defaultId = personal.id;
-            }
-            
-            if (!defaultId) {
-                defaultId = companies[0].id;
-            }
-            
-            if (defaultId) {
-                setFormData(prev => ({ ...prev, companyId: defaultId }));
+            if (targetId) {
+                setFormData(prev => ({ ...prev, companyId: targetId }));
             }
         }
     }, [companies, formData.companyId, user?.active_company_id, user?.default_company_id, default_company_id, setFormData]);

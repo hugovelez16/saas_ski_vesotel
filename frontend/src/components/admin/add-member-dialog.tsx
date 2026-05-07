@@ -57,8 +57,8 @@ export function AddMemberDialog({ companyId, companyName, existingMembers = [] }
         enabled: open, // Only fetch when dialog opens
     });
 
-    // Filter users: Exclude those who are already members AND not rejected
-    // We want to show: Non-members AND Rejected members
+    // Filter users: Exclude those who are already active members
+    // We want to show: Non-members AND Inactive members
     const eligibleUsers = users.filter(user => {
         const member = existingMembers.find(m => m.userId === user.id);
         if (!member) return true; // Not in company -> Eligible

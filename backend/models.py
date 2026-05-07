@@ -84,8 +84,8 @@ class CompanyMember(Base):
 
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), primary_key=True)
     company_id = Column(UUID(as_uuid=True), ForeignKey("companies.id"), primary_key=True)
-    role = Column(Enum(CompanyRole), default=CompanyRole.worker)
-    is_active = Column(Boolean, default=True) 
+    role = Column(Enum(CompanyRole), nullable=False, default=CompanyRole.worker, server_default="worker")
+    is_active = Column(Boolean, nullable=False, default=True, server_default="true") 
     
     # SaaS Evolution: The "Contract" - user rates for THIS specific company
     rates_config = Column(JSONB, default={})

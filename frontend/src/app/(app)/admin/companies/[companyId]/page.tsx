@@ -352,16 +352,14 @@ function MasterConfigPanel({ company, onSave }: { company: any, onSave: (data: a
 function TaxOverview({ company, isAdmin }: { company: any, isAdmin?: boolean }) {
     const { toast } = useToast();
     const queryClient = useQueryClient();
-    const [editingMember, setEditingMember] = React.useState<UserCompanyRate | null>(null);
+    const [editingMember, setEditingMember] = React.useState<CompanyMember | any>(null);
 
     const { data: members = [], isLoading } = useQuery({
         queryKey: ["companyRates", company.id],
         queryFn: () => getCompanyRates(company.id),
     });
 
-    if (isLoading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>;
-
-    const columns: ColumnDef<UserCompanyRate>[] = [
+    const columns = React.useMemo<ColumnDef<CompanyMember>[]>(() => [
         {
             accessorKey: "user",
             header: "Miembro",
@@ -376,14 +374,28 @@ function TaxOverview({ company, isAdmin }: { company: any, isAdmin?: boolean }) 
             id: "rates",
             header: "Tarifas (€)",
             cell: ({ row }) => {
-                const r = row.original;
+                const m = row.original;
+                const definitions = company.worklogDefinitions || {};
+                const activeRates = Object.entries(definitions).map(([key, def]: [string, any]) => {
+                    const rate = m.ratesConfig?.[key]?.base_rate;
+                    if (!rate || rate <= 0) return null;
+                    return { key, label: def.label, value: rate };
+                }).filter(Boolean);
+
                 return (
                     <div className="flex flex-wrap gap-2 text-[11px]">
-                        {r.hourlyRate > 0 && <span className="flex items-center bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">H: <b className="ml-1">{r.hourlyRate}€</b></span>}
-                        {r.dailyRate > 0 && <span className="flex items-center bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">D: <b className="ml-1">{r.dailyRate}€</b></span>}
-                        {r.nightRate > 0 && <span className="flex items-center bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-400 px-2 py-0.5 rounded border border-sky-200/50 dark:border-sky-800/50">N: <b className="ml-1">{r.nightRate}€</b></span>}
-                        {r.coordinationRate > 0 && <span className="flex items-center bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 px-2 py-0.5 rounded border border-indigo-200/50 dark:border-indigo-800/50">C: <b className="ml-1">{r.coordinationRate}€</b></span>}
-                        {r.hourlyRate === 0 && r.dailyRate === 0 && r.nightRate === 0 && r.coordinationRate === 0 && (
+                        {activeRates.length > 0 ? (
+                            activeRates.map((r: any) => (
+                                <span 
+                                    key={r.key} 
+                                    className="flex items-center bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700"
+                                    title={r.label}
+                                >
+                                    <span className="opacity-50 mr-1">{r.label}:</span>
+                                    <b className="text-indigo-600 dark:text-indigo-400">{r.value}€</b>
+                                </span>
+                            ))
+                        ) : (
                             <span className="text-muted-foreground italic">Sin tarifas</span>
                         )}
                     </div>
@@ -391,40 +403,47 @@ function TaxOverview({ company, isAdmin }: { company: any, isAdmin?: boolean }) 
             }
         },
         {
-            accessorKey: "isGross",
-            header: "Tipo",
-            cell: ({ row }) => (
-                <Badge variant={row.original.isGross ? "default" : "outline"} className={row.original.isGross ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20" : "text-slate-500"}>
-                    {row.original.isGross ? "Sobre Bruto" : "Sobre Neto"}
-                </Badge>
-            )
-        },
-        {
-            id: "deductions",
-            header: "Deducciones (%)",
+            id: "taxes",
+            header: "Configuración Fiscal",
             cell: ({ row }) => {
-                const r = row.original;
+                const m = row.original;
+                // Get primary tax config (first one found with overrides or just the first one)
+                const configKeys = Object.keys(m.ratesConfig || {});
+                const primaryKey = configKeys.find(k => m.ratesConfig?.[k]?.tax_overrides) || configKeys[0];
+                const primary = primaryKey ? m.ratesConfig?.[primaryKey] : null;
+                
+                if (!primary) return <span className="text-muted-foreground text-[10px]">Sin configurar</span>;
+
+                const isGross = primary.is_gross !== false;
+                const ss = primary.tax_overrides?.ss;
+                const irpf = primary.tax_overrides?.irpf ?? 0;
+                const extra = primary.tax_overrides?.extra ?? 0;
+
                 return (
-                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px]">
-                        <div className="flex items-center gap-1">
-                            <span className="text-muted-foreground">SS</span>
-                            <span className="font-medium text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-1 rounded">{(r.deductionSs ?? 0) * 100}%</span>
+                    <div className="flex items-center gap-3">
+                        <Badge variant={isGross ? "default" : "outline"} className={isGross ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20" : "text-slate-500"}>
+                            {isGross ? "Bruto" : "Neto"}
+                        </Badge>
+                        <div className="flex gap-2 text-[10px] font-mono">
+                            <span className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded" title="Seguridad Social">
+                                SS: <b className="ml-0.5">{(ss ?? (company.taxConfig?.social_security || 0)) * 100}%</b>
+                            </span>
+                            <span className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded" title="IRPF">
+                                IRPF: <b className="ml-0.5">{irpf * 100}%</b>
+                            </span>
+                            {extra > 0 && (
+                                <span className="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded">
+                                    EX: <b className="ml-0.5">{extra * 100}%</b>
+                                </span>
+                            )}
                         </div>
-                        <div className="flex items-center gap-1">
-                            <span className="text-muted-foreground">IRPF</span>
-                            <span className="font-medium text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-1 rounded">{(r.deductionIrpf ?? 0) * 100}%</span>
-                        </div>
-                        {(r.deductionExtra || 0) !== 0 && (
-                            <div className="flex items-center gap-1">
-                                <span className="text-muted-foreground">EXTRA</span>
-                                <span className="font-medium text-slate-700 dark:text-slate-300 bg-amber-100 dark:bg-amber-900/30 px-1 rounded">{(r.deductionExtra ?? 0) * 100}%</span>
-                            </div>
-                        )}
                     </div>
                 );
             }
         }
-    ];
+    ], [company]);
+
+    if (isLoading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>;
 
     return (
         <div className="relative">
@@ -439,7 +458,7 @@ function TaxOverview({ company, isAdmin }: { company: any, isAdmin?: boolean }) 
                     onOpenChange={(open) => !open && setEditingMember(null)}
                     userId={editingMember.userId}
                     company={company}
-                    rate={editingMember}
+                    member={editingMember}
                     userName={`${editingMember.user?.first_name} ${editingMember.user?.last_name}`}
                 />
             )}

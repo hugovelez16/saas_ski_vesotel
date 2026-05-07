@@ -69,7 +69,14 @@ export function CompanyDialog() {
     });
 
     function onSubmit(values: z.infer<typeof formSchema>) {
-        mutation.mutate(values);
+        mutation.mutate({
+            ...values,
+            taxConfig: { social_security: 0.0648, irpf_base: 0.15 },
+            worklogDefinitions: {
+                particular: { unit: "hours", label: "Particular" },
+                tutorial: { unit: "hours", label: "Tutorial" }
+            }
+        });
     }
 
     return (

@@ -22,7 +22,7 @@ import { createWorkLog, updateWorkLog } from "@/lib/api/work-logs";
 import api from "@/lib/api";
 
 interface UserCreateWorkLogDialogProps {
-    user: { id: string; first_name?: string | null; last_name?: string | null; default_company_id?: string | null };
+    user: { id: string; first_name?: string | null; last_name?: string | null; default_company_id?: string | null; active_company_id?: string | null };
     onLogUpdate?: () => void;
     children?: React.ReactNode;
     logToEdit?: WorkLog | null;
@@ -81,8 +81,8 @@ export function UserCreateWorkLogDialog({
     // Set default company
     useEffect(() => {
         if (open && companies.length > 0 && !formData.companyId && !logToEdit) {
-            // Priority: Last Selected > User Default > Personal > First Available
-            let targetId = lastSelectedCompanyId || user.default_company_id;
+            // Priority: Active Context > Last Selected > User Default > Personal > First Available
+            let targetId = user?.active_company_id || lastSelectedCompanyId || user.default_company_id;
 
             if (!targetId) {
                 const personal = companies.find((c: any) => c.name === "Personal");
@@ -91,7 +91,7 @@ export function UserCreateWorkLogDialog({
 
             setFormData(prev => ({ ...prev, companyId: targetId || undefined }));
         }
-    }, [open, companies, formData.companyId, logToEdit, lastSelectedCompanyId, user.default_company_id]);
+    }, [open, companies, formData.companyId, logToEdit, lastSelectedCompanyId, user?.active_company_id, user.default_company_id]);
 
     // Initialize Form Data when entering Edit Mode
     useEffect(() => {

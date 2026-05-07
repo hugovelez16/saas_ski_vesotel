@@ -1058,9 +1058,21 @@ def add_company_member(company_id: str, member_data: schemas.TokenData, db: Sess
     # Check if exists
     existing = crud.join_company(db, str(user_to_add.id), company_id)
     
-    # If it was pending or just created, force active
+    # If it was inactive or just created, force active and ensure role is set (healing)
+    needs_update = False
     if not existing.is_active:
         existing.is_active = True
+        needs_update = True
+    
+    if not existing.role: # Heal potential legacy NULLs
+        existing.role = models.CompanyRole.worker
+        needs_update = True
+
+    if existing.rates_config is None: # Heal missing JSONB field
+        existing.rates_config = {}
+        needs_update = True
+
+    if needs_update:
         db.commit()
         db.refresh(existing)
         
@@ -1194,13 +1206,19 @@ def update_company_member(company_id: str, user_id: str, member_data: schemas.Co
     is_manager = is_manager_of_company(db, current_user, company_id)
     is_self = str(user_id) == str(current_user.id)
     
+    # DEBUG
+    print(f"DEBUG: update_company_member - company_id={company_id}, user_id={user_id}, current_user_id={current_user.id}, is_manager={is_manager}, is_self={is_self}")
+    
     if not is_manager and not is_self:
-         raise HTTPException(status_code=403, detail="Not authorized")
+         raise HTTPException(status_code=403, detail=f"Not authorized. is_manager={is_manager}, is_self={is_self}, user_id={user_id}, current_user_id={current_user.id}")
     
     # Security: Non-managers cannot promote themselves or change their membership status
     if not is_manager:
-        member_data.role = None
-        member_data.is_active = None
+        # Create a clean update object with only allowed fields to avoid setting others to None
+        member_data = schemas.CompanyMemberUpdate(
+            ratesConfig=member_data.rates_config,
+            settings=member_data.settings
+        )
     
     member = crud.update_company_member(db, company_id, user_id, member_data)
     if not member:

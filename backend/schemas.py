@@ -4,8 +4,8 @@ Pydantic Schemas Module.
 This module defines the Pydantic models used for request validation and response serialization.
 It ensures that data sent to and received from the API conforms to the expected structure.
 """
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
-from typing import Optional, List, Dict, Any
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, BeforeValidator
+from typing import Optional, List, Dict, Any, Annotated
 from datetime import date as dt_date, time, datetime
 from uuid import UUID
 from enum import Enum
@@ -176,9 +176,15 @@ class CompanyResponse(Company):
     rates_config: Optional[Dict[str, Any]] = Field(None, alias="ratesConfig")
 
 
+def default_role(v: Any) -> str:
+    return v or "worker"
+
+def default_is_active(v: Any) -> bool:
+    return v if v is not None else True
+
 class CompanyMemberBase(CamelModel):
-    role: str = "worker"
-    is_active: bool = Field(True, alias="is_active") # Keep snake_case as used in frontend
+    role: Annotated[str, BeforeValidator(default_role)] = "worker"
+    is_active: Annotated[bool, BeforeValidator(default_is_active)] = Field(True, alias="is_active")
     rates_config: Optional[Dict[str, Any]] = Field(None, alias="ratesConfig")
     settings: Optional[Dict[str, Any]] = None
 

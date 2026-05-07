@@ -5,6 +5,7 @@ export const createCompany = async (data: {
     name: string;
     fiscalId?: string;
     taxConfig?: Record<string, number>;
+    worklogDefinitions?: Record<string, any>;
 }) => {
     const response = await api.post("/companies", data);
     return response.data;
