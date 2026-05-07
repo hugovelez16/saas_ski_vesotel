@@ -4,19 +4,19 @@
 export interface UserProfile {
     id: string;
     email: string;
-    first_name: string | null;
-    last_name: string | null;
+    firstName: string | null;
+    lastName: string | null;
     role: string;
-    is_active: boolean;
-    is_active_worker?: boolean;
-    is_manager?: boolean;
-    must_change_password?: boolean;
-    is_2fa_enabled?: boolean;
-    is_impersonated?: boolean;
-    is_platform_admin?: boolean;
-    active_company_id?: string | null;
-    active_role?: string | null;
-    default_company_id?: string | null;
+    isActive: boolean;
+    isActiveWorker?: boolean;
+    isManager?: boolean;
+    mustChangePassword?: boolean;
+    is2faEnabled?: boolean;
+    isImpersonated?: boolean;
+    isPlatformAdmin?: boolean;
+    activeCompanyId?: string | null;
+    activeRole?: string | null;
+    defaultCompanyId?: string | null;
     createdAt: string;
 }
 
@@ -93,7 +93,7 @@ export interface CompanyMember {
     userId: string;
     companyId: string;
     role: string;
-    is_active: boolean;
+    isActive: boolean;
     status?: string;
     ratesConfig?: DynamicRateConfig | null;
     settings?: Record<string, any>;
@@ -192,19 +192,19 @@ export interface WorkLogBulkCreate extends Omit<WorkLogCreate, 'userId'> {
  * Authentication & Sessions
  */
 export interface Token {
-    access_token: string;
-    token_type: string;
-    requires_2fa?: boolean;
-    device_token?: string;
+    accessToken: string;
+    tokenType: string;
+    requires2Fa?: boolean;
+    deviceToken?: string;
 }
 
 export interface Session {
     id: string;
     deviceName?: string | null;
     ipAddress?: string | null;
-    is_active: boolean;
+    isActive: boolean;
     lastActive: string;
-    created_at: string;
+    createdAt: string;
 }
 
 /**

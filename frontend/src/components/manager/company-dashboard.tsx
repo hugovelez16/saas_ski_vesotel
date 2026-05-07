@@ -350,7 +350,7 @@ export function CompanyDashboard({ companyId, companyName }: CompanyDashboardPro
                         {workLogs.slice(0, 5).map((log: any) => ( // Show last 5
                             <TableRow key={log.id}>
                                 <TableCell>{log.date ? format(parseISO(log.date), 'dd/MM/yyyy') : '-'}</TableCell>
-                                <TableCell>{log.user?.first_name} {log.user?.last_name}</TableCell>
+                                <TableCell>{log.user?.firstName} {log.user?.lastName}</TableCell>
                                 <TableCell className="capitalize">{log.type}</TableCell>
                                 <TableCell>{log.durationHours}h</TableCell>
                                 <TableCell className="text-right font-medium">{Number(log.amount).toFixed(2)} €</TableCell>

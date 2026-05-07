@@ -11,7 +11,7 @@ interface NotificationsSectionProps {
 
 export function NotificationsSection({ user }: NotificationsSectionProps) {
     // Virtual Notifications only
-    const needsDefaultCompany = !user.default_company_id && user.role !== 'admin';
+    const needsDefaultCompany = !user.defaultCompanyId && user.role !== 'admin';
 
     if (!needsDefaultCompany) {
         return null;

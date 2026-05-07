@@ -68,7 +68,7 @@ export function DailyReportView({ companyId }: DailyReportViewProps) {
                 return score(a) - score(b);
             });
         } else {
-            sorted.sort((a, b) => (a.user?.first_name || "").localeCompare(b.user?.first_name || ""));
+            sorted.sort((a, b) => (a.user?.firstName || "").localeCompare(b.user?.firstName || ""));
         }
         return sorted;
     }, [members, sortMode]);
@@ -132,11 +132,11 @@ export function DailyReportView({ companyId }: DailyReportViewProps) {
                                     >
                                         <Avatar className="h-8 w-8">
                                             <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                                                {member.user?.first_name?.[0]}{member.user?.last_name?.[0]}
+                                                {member.user?.firstName?.[0]}{member.user?.lastName?.[0]}
                                             </AvatarFallback>
                                         </Avatar>
                                         <div className="overflow-hidden">
-                                            <div className="font-medium text-sm truncate">{member.user?.first_name} {member.user?.last_name}</div>
+                                            <div className="font-medium text-sm truncate">{member.user?.firstName} {member.user?.lastName}</div>
                                             <div className="text-xs text-muted-foreground flex gap-1">
                                                 {member.role === 'manager' && <Badge variant="secondary" className="text-[10px] px-1 h-4">Mgr</Badge>}
                                                 {member.status !== 'active' && <Badge variant="destructive" className="text-[10px] px-1 h-4">{member.status}</Badge>}

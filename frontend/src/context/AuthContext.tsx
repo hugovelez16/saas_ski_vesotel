@@ -84,15 +84,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         // Backend returns snake_case: access_token, requires_2fa, device_token
         const tokenData = response.data;
 
-        if (tokenData.requires_2fa) {
+        if (tokenData.requires2Fa) {
             // Provisional token is also in a cookie now
             return { requires2FA: true };
         }
 
-        setAuthToken(tokenData.access_token);
+        setAuthToken(tokenData.accessToken);
         // If device token returned (e.g. rotated), update it
-        if (tokenData.device_token) {
-            localStorage.setItem('device_token', tokenData.device_token);
+        if (tokenData.deviceToken) {
+            localStorage.setItem('device_token', tokenData.deviceToken);
         }
 
 
@@ -100,7 +100,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
         if (userData?.role === 'admin') {
             router.push('/admin/companies');
-        } else if (userData?.is_manager) {
+        } else if (userData?.isManager) {
             router.push('/manager/daily-reports');
         } else {
             router.push('/dashboard');
@@ -113,13 +113,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         // Backend returns snake_case
         const tokenData = response.data;
         // setAuthToken handles the 'cookie' signal
-        setAuthToken(tokenData.access_token);
+        setAuthToken(tokenData.accessToken);
 
         const userData = await fetchUser();
 
         if (userData?.role === 'admin') {
             router.push('/admin/companies');
-        } else if (userData?.is_manager) {
+        } else if (userData?.isManager) {
             router.push('/manager/daily-reports');
         } else {
             router.push('/dashboard');
@@ -158,7 +158,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     const switchScope = async (companyId: string, role: string) => {
         try {
-            await api.post('/auth/switch-scope', { company_id: companyId, company_role: role });
+            await api.post('/auth/switch-scope', { companyId: companyId, companyRole: role });
             await fetchUser();
             // Force a full page reload to clear all caches and ensure everything (Sidebar, etc) reflects the new context
             if (!companyId) {

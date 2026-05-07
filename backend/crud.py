@@ -551,28 +551,6 @@ def join_company(db: Session, user_id: str, company_id: str):
     
     return member
 
-def get_joinable_companies(db: Session, user_id: str):
-    results = db.query(models.Company, models.CompanyMember.is_active)\
-        .outerjoin(models.CompanyMember, and_(
-            models.CompanyMember.company_id == models.Company.id,
-            models.CompanyMember.user_id == user_id
-        ))\
-        .filter(
-            or_(
-                models.CompanyMember.id == None,          # No relationship
-                models.CompanyMember.is_active == False   # Inactive relationship
-            )
-        ).all()
-    
-    companies = []
-    for company, status in results:
-        # Clone or augment the company object with status
-        # Since company is an ORM object bound to session, we shouldn't modify it directly if it affects session state.
-        # But for reading into Pydantic, we can assign a transient attribute.
-        company.is_active_member = status
-        companies.append(company)
-        
-    return companies
 
 def get_user_companies(db: Session, user_id: str, include_inactive: bool = False):
     """Get companies the user is a member of (joined), merging member-specific settings."""

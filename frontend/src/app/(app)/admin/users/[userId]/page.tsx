@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -488,11 +489,11 @@ export default function UserDetailPage() {
                     <ArrowLeft className="h-5 w-5" />
                 </Button>
                 <div className="flex-1">
-                    <h1 className="text-3xl font-bold tracking-tight text-slate-900">{user.first_name} {user.last_name}</h1>
+                    <h1 className="text-3xl font-bold tracking-tight text-slate-900">{user.firstName} {user.lastName}</h1>
                     <div className="flex items-center gap-2 text-muted-foreground">
                         <p>{user.email}</p>
                         <span>•</span>
-                        <Badge variant={user.is_active ? "default" : "destructive"}>{user.is_active ? "Activo" : "Inactivo"}</Badge>
+                        <Badge variant={user.isActive ? "default" : "destructive"}>{user.isActive ? "Activo" : "Inactivo"}</Badge>
                         <Badge variant="outline">{user.role}</Badge>
                     </div>
                 </div>

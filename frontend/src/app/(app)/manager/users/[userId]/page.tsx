@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -193,7 +194,7 @@ export default function ManagerUserDetailsPage({ params }: { params: Promise<{ u
                         aVal = a.client || "";
                         bVal = b.client || "";
                         break;
-                    case 'created_at':
+                    case 'createdAt':
                         aVal = a.createdAt || "";
                         bVal = b.createdAt || "";
                         break;
@@ -328,18 +329,18 @@ export default function ManagerUserDetailsPage({ params }: { params: Promise<{ u
                         <UserIcon size={32} />
                     </div>
                     <div>
-                        <h1 className="text-3xl font-bold tracking-tight">{user.first_name} {user.last_name}</h1>
+                        <h1 className="text-3xl font-bold tracking-tight">{user.firstName} {user.lastName}</h1>
                         <div className="flex items-center gap-2 text-muted-foreground">
                             <span>{user.email}</span>
                             <span>•</span>
-                            <Badge variant={user.is_active ? "default" : "destructive"}>
-                                {user.is_active ? "Active" : "Inactive"}
+                            <Badge variant={user.isActive ? "default" : "destructive"}>
+                                {user.isActive ? "Active" : "Inactive"}
                             </Badge>
                             <Badge variant="outline" className="font-mono text-xs text-muted-foreground">{user.id}</Badge>
                         </div>
                         <div className="flex gap-2 mt-1">
-                            {user.is_active_worker && <Badge variant="secondary" className="text-xs border-green-200 bg-green-50 text-green-700">Worker</Badge>}
-                            {user.is_manager && <Badge variant="secondary" className="text-xs border-blue-200 bg-blue-50 text-blue-700">Manager</Badge>}
+                            {user.isActiveWorker && <Badge variant="secondary" className="text-xs border-green-200 bg-green-50 text-green-700">Worker</Badge>}
+                            {user.isManager && <Badge variant="secondary" className="text-xs border-blue-200 bg-blue-50 text-blue-700">Manager</Badge>}
                             <span className="text-xs text-muted-foreground flex items-center ml-2">
                                 <Calendar className="w-3 h-3 mr-1" /> Moved/Created: {user.createdAt ? format(new Date(user.createdAt), 'MMM d, yyyy') : 'N/A'}
                             </span>

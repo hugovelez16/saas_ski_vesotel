@@ -4,8 +4,8 @@ import { User, Token, Session } from "@/lib/types";
 export interface CreateUserRequest {
     email: string;
     password?: string;
-    first_name: string;
-    last_name: string;
+    firstName: string;
+    lastName: string;
     role?: string;
     companyId?: string | null;
     sendEmail?: boolean;
@@ -42,8 +42,8 @@ export const createUser = async (data: CreateUserRequest): Promise<User> => {
     return response.data;
 };
 
-export const updateUserStatus = async (userId: string, is_active: boolean): Promise<any> => {
-    const response = await api.put(`/users/${userId}/status?is_active=${is_active}`);
+export const updateUserStatus = async (userId: string, isActive: boolean): Promise<any> => {
+    const response = await api.put(`/users/${userId}/status?isActive=${isActive}`);
     return response.data;
 };
 
@@ -73,11 +73,4 @@ export const impersonateUser = async (userId: string): Promise<Token> => {
 };
 
 
-export const getNotifications = async (): Promise<any[]> => {
-    const response = await api.get("/users/me/notifications");
-    return response.data;
-};
 
-export const markNotificationRead = async (notificationId: string): Promise<void> => {
-    await api.post(`/users/me/notifications/${notificationId}/read`);
-};

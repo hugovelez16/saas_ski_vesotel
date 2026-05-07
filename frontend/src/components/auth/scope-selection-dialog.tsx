@@ -49,7 +49,7 @@ export function ScopeSelectionDialog({ open, onOpenChange }: ScopeSelectionDialo
                 {user?.role === 'admin' && (
                     <div className={cn(
                         "mb-2 p-4 rounded-xl border-2 transition-all flex items-center justify-between",
-                        !user?.active_company_id ? "border-indigo-600 bg-indigo-50" : "border-slate-100 bg-slate-50/50"
+                        !user?.activeCompanyId ? "border-indigo-600 bg-indigo-50" : "border-slate-100 bg-slate-50/50"
                     )}>
                         <div className="flex items-center space-x-3">
                             <div className="p-2 bg-indigo-100 rounded-lg">
@@ -61,12 +61,12 @@ export function ScopeSelectionDialog({ open, onOpenChange }: ScopeSelectionDialo
                             </div>
                         </div>
                         <Button 
-                            variant={!user?.active_company_id ? "default" : "outline"}
+                            variant={!user?.activeCompanyId ? "default" : "outline"}
                             size="sm"
                             onClick={() => handleSelect(null as any, null as any)}
                             className="text-xs h-8"
                         >
-                            {!user?.active_company_id ? "Activo" : "Restablecer"}
+                            {!user?.activeCompanyId ? "Activo" : "Restablecer"}
                         </Button>
                     </div>
                 )}
@@ -78,7 +78,7 @@ export function ScopeSelectionDialog({ open, onOpenChange }: ScopeSelectionDialo
                         <div className="text-center py-4 text-muted-foreground">No hay empresas disponibles.</div>
                     ) : (
                         companies.map((company: any) => {
-                            const isCurrentCompany = user?.active_company_id === company.id;
+                            const isCurrentCompany = user?.activeCompanyId === company.id;
                             const dbRole = (company.role || 'N/A').toLowerCase();
                             const isPlatformAdmin = user?.role === 'admin';
                             const canBeManager = isPlatformAdmin || ['admin', 'manager', 'owner'].includes(dbRole);
@@ -106,7 +106,7 @@ export function ScopeSelectionDialog({ open, onOpenChange }: ScopeSelectionDialo
 
                                     <div className="grid grid-cols-2 gap-2">
                                         <Button
-                                            variant={user?.active_role === 'worker' && isCurrentCompany ? "default" : "outline"}
+                                            variant={user?.activeRole === 'worker' && isCurrentCompany ? "default" : "outline"}
                                             size="sm"
                                             className="justify-start h-auto py-2"
                                             onClick={() => handleSelect(company.id, 'worker')}
@@ -115,14 +115,14 @@ export function ScopeSelectionDialog({ open, onOpenChange }: ScopeSelectionDialo
                                             <div className="flex flex-col items-start">
                                                 <span className="text-xs font-semibold">Trabajador</span>
                                             </div>
-                                            {user?.active_role === 'worker' && isCurrentCompany && (
+                                            {user?.activeRole === 'worker' && isCurrentCompany && (
                                                 <Check className="ml-auto h-3 w-3" />
                                             )}
                                         </Button>
 
                                         {canBeManager && (
                                             <Button
-                                                variant={user?.active_role === 'manager' && isCurrentCompany ? "default" : "outline"}
+                                                variant={user?.activeRole === 'manager' && isCurrentCompany ? "default" : "outline"}
                                                 size="sm"
                                                 className="justify-start h-auto py-2"
                                                 onClick={() => handleSelect(company.id, 'manager')}
@@ -131,7 +131,7 @@ export function ScopeSelectionDialog({ open, onOpenChange }: ScopeSelectionDialo
                                                 <div className="flex flex-col items-start">
                                                     <span className="text-xs font-semibold">Manager</span>
                                                 </div>
-                                                {user?.active_role === 'manager' && isCurrentCompany && (
+                                                {user?.activeRole === 'manager' && isCurrentCompany && (
                                                     <Check className="ml-auto h-3 w-3" />
                                                 )}
                                             </Button>

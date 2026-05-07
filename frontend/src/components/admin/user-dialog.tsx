@@ -41,10 +41,10 @@ import { CompanyResponse } from "@/lib/types";
 
 const formSchema = z.object({
     email: z.string().email("Please enter a valid email address"),
-    first_name: z.string().min(2, "First name must be at least 2 characters"),
-    last_name: z.string().min(2, "Last name must be at least 2 characters"),
+    firstName: z.string().min(2, "First name must be at least 2 characters"),
+    lastName: z.string().min(2, "Last name must be at least 2 characters"),
     role: z.enum(["admin", "user"]),
-    is_active: z.boolean().default(true),
+    isActive: z.boolean().default(true),
     company_id: z.string().optional(),
     send_email: z.boolean().default(true),
 });
@@ -58,10 +58,10 @@ export function UserDialog() {
         resolver: zodResolver(formSchema),
         defaultValues: {
             email: "",
-            first_name: "",
-            last_name: "",
+            firstName: "",
+            lastName: "",
             role: "user",
-            is_active: true,
+            isActive: true,
             company_id: "",
             send_email: true,
         },
@@ -132,7 +132,7 @@ export function UserDialog() {
                             <div className="grid grid-cols-2 gap-4">
                                 <FormField
                                     control={form.control}
-                                    name="first_name"
+                                    name="firstName"
                                     render={({ field }) => (
                                         <FormItem>
                                             <FormLabel className="flex items-center gap-2 text-sm font-medium">
@@ -152,7 +152,7 @@ export function UserDialog() {
                                 />
                                 <FormField
                                     control={form.control}
-                                    name="last_name"
+                                    name="lastName"
                                     render={({ field }) => (
                                         <FormItem>
                                             <FormLabel className="flex items-center gap-2 text-sm font-medium">
@@ -222,7 +222,7 @@ export function UserDialog() {
 
                                 <FormField
                                     control={form.control}
-                                    name="is_active"
+                                    name="isActive"
                                     render={({ field }) => (
                                         <FormItem>
                                             <FormLabel className="flex items-center gap-2 text-sm font-medium">

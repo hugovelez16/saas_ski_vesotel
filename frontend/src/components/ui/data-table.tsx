@@ -171,7 +171,7 @@ export function DataTable<TData, TValue>({
                                     if (typeof headerProp === 'string') {
                                         label = headerProp;
                                     } else {
-                                        // Simple title case for IDs like 'is_active'
+                                        // Simple title case for IDs like 'isActive'
                                         label = label.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
                                     }
 

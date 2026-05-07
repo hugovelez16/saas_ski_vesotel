@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -46,9 +47,9 @@ import { Company, CompanyMember } from "@/lib/types";
 
 // User Info Form
 const userFormSchema = z.object({
-  first_name: z.string().min(2),
-  last_name: z.string().min(2),
-  default_company_id: z.string().optional(),
+  firstName: z.string().min(2),
+  lastName: z.string().min(2),
+  defaultCompanyId: z.string().optional(),
 });
 
 const passwordSchema = z.object({
@@ -88,14 +89,14 @@ export default function ProfilePage() {
 
   // Auto-select company from active context or default
   useEffect(() => {
-    if (user?.active_company_id) {
-      setSelectedCompanyId(user.active_company_id);
-    } else if (!selectedCompanyId && user?.default_company_id) {
-      setSelectedCompanyId(user.default_company_id);
+    if (user?.activeCompanyId) {
+      setSelectedCompanyId(user.activeCompanyId);
+    } else if (!selectedCompanyId && user?.defaultCompanyId) {
+      setSelectedCompanyId(user.defaultCompanyId);
     } else if (!selectedCompanyId && myCompanies.length > 0) {
       setSelectedCompanyId(myCompanies[0].id);
     }
-  }, [user?.active_company_id, user?.default_company_id, myCompanies.length]);
+  }, [user?.activeCompanyId, user?.defaultCompanyId, myCompanies.length]);
 
   const currentCompany = myCompanies.find((c: Company) => c.id === selectedCompanyId);
   const companySettings = currentCompany?.settings || {};
@@ -111,9 +112,9 @@ export default function ProfilePage() {
   const userForm = useForm({
     resolver: zodResolver(userFormSchema),
     defaultValues: {
-      first_name: user?.first_name || "",
-      last_name: user?.last_name || "",
-      default_company_id: user?.default_company_id || "",
+      firstName: user?.firstName || "",
+      lastName: user?.lastName || "",
+      defaultCompanyId: user?.defaultCompanyId || "",
     }
   });
 
@@ -141,9 +142,9 @@ export default function ProfilePage() {
   useEffect(() => {
     if (user) {
       userForm.reset({
-        first_name: user.first_name || "",
-        last_name: user.last_name || "",
-        default_company_id: user.default_company_id || "",
+        firstName: user.firstName || "",
+        lastName: user.lastName || "",
+        defaultCompanyId: user.defaultCompanyId || "",
       });
     }
   }, [user?.id, userForm]);
@@ -202,7 +203,7 @@ export default function ProfilePage() {
 
   // Mutations
   const userMutation = useMutation({
-    mutationFn: (values: { first_name: string; last_name: string; default_company_id?: string }) => updateMe(values),
+    mutationFn: (values: { firstName: string; lastName: string; defaultCompanyId?: string }) => updateMe(values),
     onSuccess: async () => {
       await checkAuth();
       toast({ title: "Profile updated" });
@@ -276,7 +277,7 @@ export default function ProfilePage() {
     rateMutation.mutate(payload);
   }
 
-  function onUserSubmit(data: { first_name: string; last_name: string; default_company_id?: string }) {
+  function onUserSubmit(data: { firstName: string; lastName: string; defaultCompanyId?: string }) {
     userMutation.mutate(data);
   }
 
@@ -309,7 +310,7 @@ export default function ProfilePage() {
               <form onSubmit={userForm.handleSubmit(onUserSubmit)} className="grid gap-4 md:grid-cols-2">
                 <FormField
                   control={userForm.control}
-                  name="first_name"
+                  name="firstName"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>First Name</FormLabel>
@@ -322,7 +323,7 @@ export default function ProfilePage() {
                 />
                 <FormField
                   control={userForm.control}
-                  name="last_name"
+                  name="lastName"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Last Name</FormLabel>
@@ -335,7 +336,7 @@ export default function ProfilePage() {
                 />
                 <FormField
                   control={userForm.control}
-                  name="default_company_id"
+                  name="defaultCompanyId"
                   render={({ field }) => (
                     <FormItem className="md:col-span-2">
                       <FormLabel>Empresa de Inicio (Login)</FormLabel>
@@ -441,7 +442,7 @@ export default function ProfilePage() {
                 <CardDescription>Manage your rates for each company.</CardDescription>
               </CardHeader>
               <CardContent>
-                {!user?.active_company_id && myCompanies.length > 1 && (
+                {!user?.activeCompanyId && myCompanies.length > 1 && (
                   <div className="mb-6">
                     <Label className="mb-2 block">Select Company</Label>
                     <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
@@ -460,7 +461,7 @@ export default function ProfilePage() {
                   </div>
                 )}
 
-                {user?.active_company_id && currentCompany && (
+                {user?.activeCompanyId && currentCompany && (
                   <div className="mb-6 flex items-center gap-2 px-4 py-3 bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900 rounded-lg">
                     <Building2 className="h-5 w-5 text-indigo-600" />
                     <div>

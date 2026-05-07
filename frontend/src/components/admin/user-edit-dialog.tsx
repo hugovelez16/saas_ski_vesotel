@@ -38,8 +38,8 @@ import { User } from "@/lib/types";
 
 const formSchema = z.object({
     email: z.string().email(),
-    first_name: z.string().min(2),
-    last_name: z.string().min(2),
+    firstName: z.string().min(2),
+    lastName: z.string().min(2),
     role: z.enum(["admin", "user"]),
     password: z.string().min(6).optional().or(z.literal("")),
 });
@@ -58,8 +58,8 @@ export function UserEditDialog({ user, trigger }: UserEditDialogProps) {
         resolver: zodResolver(formSchema),
         defaultValues: {
             email: user.email,
-            first_name: user.first_name || "",
-            last_name: user.last_name || "",
+            firstName: user.firstName || "",
+            lastName: user.lastName || "",
             role: (user.role as "admin" | "user") || "user",
             password: "",
         },
@@ -68,8 +68,8 @@ export function UserEditDialog({ user, trigger }: UserEditDialogProps) {
     useEffect(() => {
         form.reset({
             email: user.email,
-            first_name: user.first_name || "",
-            last_name: user.last_name || "",
+            firstName: user.firstName || "",
+            lastName: user.lastName || "",
             role: (user.role as "admin" | "user") || "user",
             password: "",
         });
@@ -126,7 +126,7 @@ export function UserEditDialog({ user, trigger }: UserEditDialogProps) {
                         <div className="grid grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
-                                name="first_name"
+                                name="firstName"
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>First Name</FormLabel>
@@ -139,7 +139,7 @@ export function UserEditDialog({ user, trigger }: UserEditDialogProps) {
                             />
                             <FormField
                                 control={form.control}
-                                name="last_name"
+                                name="lastName"
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Last Name</FormLabel>

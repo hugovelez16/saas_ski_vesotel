@@ -22,32 +22,32 @@ describe('Type Definitions — Compile-time Safety', () => {
         const user: UserProfile = {
             id: 'u-1',
             email: 'test@example.com',
-            first_name: 'John',
-            last_name: 'Doe',
+            firstName: 'John',
+            lastName: 'Doe',
             role: 'user',
-            is_active: true,
+            isActive: true,
             createdAt: '2026-01-01T00:00:00Z',
         };
 
         expect(user.id).toBe('u-1');
-        expect(user.first_name).toBe('John');
-        expect(user.last_name).toBe('Doe');
-        expect(user.is_active).toBe(true);
+        expect(user.firstName).toBe('John');
+        expect(user.lastName).toBe('Doe');
+        expect(user.isActive).toBe(true);
     });
 
     it('User should be an alias for UserProfile', () => {
         const user: User = {
             id: 'u-1',
             email: 'test@example.com',
-            first_name: 'Test',
-            last_name: 'User',
+            firstName: 'Test',
+            lastName: 'User',
             role: 'admin',
-            is_active: true,
+            isActive: true,
             createdAt: '2026-01-01T00:00:00Z',
         };
         // If User is NOT the same as UserProfile, this would fail
         const profile: UserProfile = user;
-        expect(profile.first_name).toBe('Test');
+        expect(profile.firstName).toBe('Test');
     });
 
     it('WorkLog should have financial fields', () => {
@@ -131,12 +131,12 @@ describe('Type Definitions — Compile-time Safety', () => {
             userId: 'u-1',
             companyId: 'c-1',
             role: 'worker',
-            is_active: true,
+            isActive: true,
             joinedAt: '2026-01-01',
         };
 
         expect(member.userId).toBe('u-1');
-        expect(member.is_active).toBe(true);
+        expect(member.isActive).toBe(true);
     });
 
     it('UserCompanyRate should include optional user relation', () => {
@@ -151,15 +151,15 @@ describe('Type Definitions — Compile-time Safety', () => {
             user: {
                 id: 'u-1',
                 email: 'test@test.com',
-                first_name: 'John',
-                last_name: 'Doe',
+                firstName: 'John',
+                lastName: 'Doe',
                 role: 'user',
-                is_active: true,
+                isActive: true,
                 createdAt: '2026-01-01',
             },
         };
 
-        expect(rate.user?.first_name).toBe('John');
+        expect(rate.user?.firstName).toBe('John');
     });
 
     it('DynamicRateConfig should support dynamic keys', () => {
@@ -178,12 +178,12 @@ describe('Type Definitions — Compile-time Safety', () => {
             id: 's-1',
             deviceName: 'Chrome',
             ipAddress: '127.0.0.1',
-            is_active: true,
+            isActive: true,
             lastActive: '2026-01-15',
-            created_at: '2026-01-01',
+            createdAt: '2026-01-01',
         };
 
-        expect(session.is_active).toBe(true);
+        expect(session.isActive).toBe(true);
         expect(session.lastActive).toBe('2026-01-15');
     });
 });

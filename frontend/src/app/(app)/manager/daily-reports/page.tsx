@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
@@ -81,7 +82,7 @@ export default function ManagerDailyReportPage() {
         return company.members.map((m: any) => ({
             ...m.user,
             relationRole: m.role,
-            relationIsActive: m.is_active
+            relationIsActive: m.isActive
         }));
     }, [companyDetails, selectedCompanyId]);
 
@@ -120,7 +121,7 @@ export default function ManagerDailyReportPage() {
             const pB = getPriority(b);
             if (pA !== pB) return pA - pB;
 
-            return (a.first_name || "").localeCompare(b.first_name || "");
+            return (a.firstName || "").localeCompare(b.firstName || "");
         });
 
         // Apply Manual Override
@@ -252,23 +253,23 @@ export default function ManagerDailyReportPage() {
 
                                         {/* Mobile View: Initials */}
                                         <div
-                                            className={cn("md:hidden w-full h-full flex items-center justify-center", currentUser?.is_manager ? "cursor-pointer" : "cursor-default")}
-                                            onClick={() => currentUser?.is_manager && router.push(`/manager/users/${user.id}`)}
+                                            className={cn("md:hidden w-full h-full flex items-center justify-center", currentUser?.isManager ? "cursor-pointer" : "cursor-default")}
+                                            onClick={() => currentUser?.isManager && router.push(`/manager/users/${user.id}`)}
                                         >
                                             <div className={cn(
                                                 "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border",
                                                 user.relationIsActive ? "bg-green-100 text-green-700 border-green-200" : "bg-red-100 text-red-700 border-red-200"
                                             )}>
-                                                {(user.first_name?.[0] || "")}{(user.last_name?.[0] || "")}
+                                                {(user.firstName?.[0] || "")}{(user.lastName?.[0] || "")}
                                             </div>
                                         </div>
 
                                         {/* Desktop View: Full Details */}
                                         <div
-                                            className={cn("hidden md:block hover:underline truncate flex-1", currentUser?.is_manager ? "cursor-pointer" : "cursor-default")}
-                                            onClick={() => currentUser?.is_manager && router.push(`/manager/users/${user.id}`)}
+                                            className={cn("hidden md:block hover:underline truncate flex-1", currentUser?.isManager ? "cursor-pointer" : "cursor-default")}
+                                            onClick={() => currentUser?.isManager && router.push(`/manager/users/${user.id}`)}
                                         >
-                                            <span className="font-medium text-sm">{user.first_name} {user.last_name}</span>
+                                            <span className="font-medium text-sm">{user.firstName} {user.lastName}</span>
                                             <div className="flex gap-1 mt-1">
                                                 {user.relationIsActive ?
                                                     <div className="w-2 h-2 rounded-full bg-green-500" title="Active" /> :
@@ -281,7 +282,7 @@ export default function ManagerDailyReportPage() {
 
                                     {/* Mobile Name Column */}
                                     <div className="md:hidden min-w-[120px] p-2 text-xs border-r flex items-center truncate bg-slate-50/50 text-muted-foreground">
-                                        {user.first_name} {user.last_name}
+                                        {user.firstName} {user.lastName}
                                     </div>
 
                                     <div className="flex-1 relative h-12 flex">

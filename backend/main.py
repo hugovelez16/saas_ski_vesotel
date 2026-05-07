@@ -4,7 +4,7 @@ Main API Application Module.
 This module defines the FastAPI application, API endpoints, and middleware configuration.
 It serves as the entry point for the backend service.
 """
-from fastapi import FastAPI, Depends, HTTPException, status, BackgroundTasks, Form, Request, Response
+from fastapi import FastAPI, Depends, HTTPException, status, Form, Request, Response
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session, joinedload
@@ -982,46 +982,7 @@ def update_user(user_id: str, user: schemas.UserUpdate, db: Session = Depends(ge
 
 # --- Company Member Management ---
 
-@app.post("/companies/{company_id}/join", response_model=schemas.CompanyMemberResponse)
-async def join_company(company_id: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_verified_user)):
-    """
-    Request to join a company.
-    """
-    # Verify company exists
-    company = db.query(models.Company).filter(models.Company.id == company_id).first()
-    if not company:
-        raise HTTPException(status_code=404, detail="Company not found")
-        
-    member = crud.join_company(db, str(current_user.id), company_id)
-    
-    # Notify User
-    background_tasks.add_task(
-        email_utils.send_notification_email,
-        current_user.email,
-        f"Request to join {company.name}",
-        f"You have requested to join <strong>{company.name}</strong>. An administrator will review your request shortly."
-    )
-    
-    # Notify Admin (Hardcoded or based on role lookup - for this MVP just logging or notifying specific admin)
-    # Finding company admins:
-    admins = db.query(models.User).filter(models.User.is_platform_admin == True).all()
-    for admin in admins:
-         background_tasks.add_task(
-            email_utils.send_notification_email,
-            admin.email,
-            f"New Member Request: {company.name}",
-            f"User <strong>{current_user.first_name} {current_user.last_name}</strong> ({current_user.email}) has requested to join <strong>{company.name}</strong>.",
-            "https://clasesski.vesotel.com/admin/companies" # Link to admin panel
-        )
-    
-    return member
 
-@app.get("/companies/available", response_model=List[schemas.CompanyResponse])
-def read_available_companies(db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_verified_user)):
-    """
-    Get companies that the user is NOT a member of.
-    """
-    return crud.get_joinable_companies(db, str(current_user.id))
 
 
 
@@ -1079,7 +1040,7 @@ def add_company_member(company_id: str, member_data: schemas.TokenData, db: Sess
     return existing
 
 @app.put("/companies/{company_id}/members/{user_id}/status", response_model=schemas.CompanyMemberResponse)
-def update_member_status(company_id: str, user_id: str, status: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
+def update_member_status(company_id: str, user_id: str, status: str, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
     """
     Approve/Reject company membership.
     """
@@ -1090,87 +1051,9 @@ def update_member_status(company_id: str, user_id: str, status: str, background_
     if not member:
         raise HTTPException(status_code=404, detail="Member request not found")
     
-    # Notify User on Status Change - REMOVED AUTO EMAIL AS REQUESTED
-    # User requested explicit "Notify" button. 
-    # Logic moved to new endpoint /notify-member-status
-    
     return member
 
-@app.post("/companies/{company_id}/members/{user_id}/notify-status")
-def notify_member_status(company_id: str, user_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_verified_user)):
-    """
-    Manually send an email notification regarding member status/role.
-    """
-    if not getattr(current_user, "is_platform_admin", False): # And maybe Manager?
-         raise HTTPException(status_code=403, detail="Not authorized")
-    
-    member = crud.get_company_member(db, company_id, user_id)
-    if not member:
-         raise HTTPException(status_code=404, detail="Member not found")
-         
-    user_obj = member.user
-    company = member.members # Relationship usage, confirm name
-    # crud.get_company_member usually returns Member object. 
-    # In models, member.members -> Company. Confusing name but established.
-    
-    if not user_obj or not company:
-         raise HTTPException(status_code=404, detail="User or Company not found")
 
-    subject = f"Update from {company.name}"
-    msg = f"Your membership status in <strong>{company.name}</strong> is currently: <strong>{member.status}</strong>."
-    
-    if member.is_active:
-         msg += "<br><br>Please check your profile to ensure your <strong>rates</strong> are configured correctly."
-
-    # Using background task here? No, user clicked a button, explicit wait is fine or background.
-    # Since we are inside a sync function, we need to be careful with async send.
-    # But email_utils.send_notification_email is async.
-    # We can use BackgroundTasks if we add it to signature, but I can't easily add it to this signature without `BackgroundTasks`.
-    # Let's add BackgroundTasks to signature.
-
-    return {"message": "Notification queued"}
-
-# Re-defining with BackgroundTasks
-@app.post("/companies/{company_id}/members/{user_id}/notify", response_model=schemas.CompanyMemberResponse)
-async def notify_company_member(
-    company_id: str, 
-    user_id: str, 
-    background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db), 
-    current_user: models.User = Depends(auth.get_verified_user)
-):
-    if not is_manager_of_company(db, current_user, company_id):
-         raise HTTPException(status_code=403, detail="Not authorized")
-         
-    member = db.query(models.CompanyMember).filter(
-        models.CompanyMember.company_id == company_id,
-        models.CompanyMember.user_id == user_id
-    ).first()
-    
-    if not member:
-         raise HTTPException(status_code=404, detail="Member not found")
-    
-    user_obj = db.query(models.User).filter(models.User.id == user_id).first()
-    company = db.query(models.Company).filter(models.Company.id == company_id).first()
-    
-    subject = f"Update from {company.name}"
-    msg = f"Your status in <strong>{company.name}</strong> has been updated to: <strong>{member.status.value.title()}</strong>."
-    
-    if member.role == models.CompanyRole.manager:
-         msg += "<br><strong>You have been assigned as a Supervisor/Manager.</strong>"
-    
-    background_tasks.add_task(
-        email_utils.send_notification_email,
-        user_obj.email,
-        subject,
-        msg
-    )
-    
-    return member
-
-    return member
-
-    return member
 
 @app.get("/companies/{company_id}", response_model=schemas.CompanyResponse)
 def read_company(company_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):

@@ -68,7 +68,7 @@ class WorkLogResponse(WorkLogBase):
 
 # UserDeviceResponse removed. Use SessionResponse instead.
 
-class UserBase(BaseModel):
+class UserBase(CamelModel):
     """Base schema for User data, containing common fields."""
     email: EmailStr
     first_name: Optional[str] = None
@@ -99,7 +99,7 @@ class UserResponse(UserBase):
     class Config:
         from_attributes = True
 
-class UserUpdate(BaseModel):
+class UserUpdate(CamelModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     email: Optional[EmailStr] = None
@@ -107,12 +107,12 @@ class UserUpdate(BaseModel):
     is_active: Optional[bool] = None
     default_company_id: Optional[UUID] = None
 
-class UserSelfUpdate(BaseModel):
+class UserSelfUpdate(CamelModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     default_company_id: Optional[UUID] = None
 
-class PasswordChange(BaseModel):
+class PasswordChange(CamelModel):
     current_password: str
     new_password: str
 
@@ -184,43 +184,43 @@ def default_is_active(v: Any) -> bool:
 
 class CompanyMemberBase(CamelModel):
     role: Annotated[str, BeforeValidator(default_role)] = "worker"
-    is_active: Annotated[bool, BeforeValidator(default_is_active)] = Field(True, alias="is_active")
-    rates_config: Optional[Dict[str, Any]] = Field(None, alias="ratesConfig")
+    is_active: Annotated[bool, BeforeValidator(default_is_active)] = True
+    rates_config: Optional[Dict[str, Any]] = None
     settings: Optional[Dict[str, Any]] = None
 
 class CompanyMemberUpdate(CamelModel):
     role: Optional[str] = None
     is_active: Optional[bool] = None
-    rates_config: Optional[Dict[str, Any]] = Field(None, alias="ratesConfig")
+    rates_config: Optional[Dict[str, Any]] = None
     settings: Optional[Dict[str, Any]] = None
 
 class CompanyMemberResponse(CompanyMemberBase):
-    user_id: UUID = Field(..., alias="userId")
-    company_id: UUID = Field(..., alias="companyId")
-    joined_at: datetime = Field(..., alias="joinedAt")
+    user_id: UUID
+    company_id: UUID
+    joined_at: datetime
     user: Optional[UserResponse] = None
 
 class CompanyWithMembers(CompanyResponse):
     members: List[CompanyMemberResponse] = []
 
 
-class Token(BaseModel):
+class Token(CamelModel):
     access_token: str
     token_type: str
     requires_2fa: bool = False
 
-class Verify2FA(BaseModel):
+class Verify2FA(CamelModel):
     code: str
 
 class TOTPSetupResponse(CamelModel):
     secret: str
     qr_code_uri: str
 
-class TOTPActivate(BaseModel):
+class TOTPActivate(CamelModel):
     code: str
 
 
-class TokenData(BaseModel):
+class TokenData(CamelModel):
     user_id: Optional[str] = None
     company_id: Optional[str] = None
     company_role: Optional[str] = None

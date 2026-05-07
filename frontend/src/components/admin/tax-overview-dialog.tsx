@@ -63,7 +63,7 @@ export function TaxOverviewDialog({ companyId, companyName }: TaxOverviewDialogP
                                 ) : (
                                     members.map((member: CompanyMember) => {
                                         const rate = mapMemberToLegacyRate(member);
-                                        const userName = member.user ? `${member.user.first_name || ''} ${member.user.last_name || ''}` : 'Unknown User';
+                                        const userName = member.user ? `${member.user.firstName || ''} ${member.user.lastName || ''}` : 'Unknown User';
                                         return (
                                             <TableRow key={member.userId}>
                                                 <TableCell className="font-medium">{userName}</TableCell>

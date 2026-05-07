@@ -70,7 +70,7 @@ export default function ManagerBillingPage() {
                 userMap.set(member.user_id, {
                     row: {
                         userId: member.user_id,
-                        userName: `${member.user.first_name || ''} ${member.user.last_name || ''}`.trim() || member.user.email,
+                        userName: `${member.user.firstName || ''} ${member.user.lastName || ''}`.trim() || member.user.email,
                         userEmail: member.user.email,
                         particularHours: 0,
                         particularAmount: 0,

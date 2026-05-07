@@ -45,14 +45,14 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     // ... (managedCompanies removed as legacy switcher is gone)
 
     // Determine target company ID for links (persist current -> session context -> default to first)
-    const targetCompanyId = currentCompanyId || user?.active_company_id || (myCompanies.length > 0 ? myCompanies[0].id : null);
+    const targetCompanyId = currentCompanyId || user?.activeCompanyId || (myCompanies.length > 0 ? myCompanies[0].id : null);
     const querySuffix = targetCompanyId ? `?companyId=${targetCompanyId}` : "";
 
     // Build Nav Groups
     const navGroups: { label?: string; items: any[] }[] = [];
 
-    const isPlatformAdmin = user?.role === 'admin' || user?.is_platform_admin;
-    const activeRole = user?.active_role;
+    const isPlatformAdmin = user?.role === 'admin' || user?.isPlatformAdmin;
+    const activeRole = user?.activeRole;
 
     // Platform Admin Logic: Exclusive visibility
     if (isPlatformAdmin) {

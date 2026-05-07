@@ -23,8 +23,6 @@ import {
     getUserSessions,
     revokeUserSession,
     impersonateUser,
-    getNotifications,
-    markNotificationRead,
     resetPasswordEmail,
 } from '@/lib/api/users';
 
@@ -66,8 +64,8 @@ describe('Users API Client', () => {
         it('should POST /users with camelCase data', async () => {
             const userData = {
                 email: 'new@test.com',
-                first_name: 'New',
-                last_name: 'User',
+                firstName: 'New',
+                lastName: 'User',
                 role: 'user',
             };
             (mockedApi.post as any).mockResolvedValue({ data: { id: 'u-new', ...userData } });
@@ -79,7 +77,7 @@ describe('Users API Client', () => {
 
     describe('updateUser', () => {
         it('should PUT /users/:id', async () => {
-            const update = { first_name: 'Updated' };
+            const update = { firstName: 'Updated' };
             (mockedApi.put as any).mockResolvedValue({ data: { id: 'u-1', ...update } });
             await updateUser('u-1', update);
             expect(mockedApi.put).toHaveBeenCalledWith('/users/u-1', update);
@@ -88,7 +86,7 @@ describe('Users API Client', () => {
 
     describe('updateMe', () => {
         it('should PUT /users/me', async () => {
-            const update = { first_name: 'Me' };
+            const update = { firstName: 'Me' };
             (mockedApi.put as any).mockResolvedValue({ data: update });
             await updateMe(update);
             expect(mockedApi.put).toHaveBeenCalledWith('/users/me', update);
@@ -107,10 +105,10 @@ describe('Users API Client', () => {
     });
 
     describe('updateUserStatus', () => {
-        it('should PUT /users/:id/status with is_active query param', async () => {
+        it('should PUT /users/:id/status with isActive query param', async () => {
             (mockedApi.put as any).mockResolvedValue({ data: {} });
             await updateUserStatus('u-1', false);
-            expect(mockedApi.put).toHaveBeenCalledWith('/users/u-1/status?is_active=false');
+            expect(mockedApi.put).toHaveBeenCalledWith('/users/u-1/status?isActive=false');
         });
     });
 
@@ -144,18 +142,4 @@ describe('Users API Client', () => {
         });
     });
 
-    describe('Notifications', () => {
-        it('getNotifications should GET /users/me/notifications', async () => {
-            (mockedApi.get as any).mockResolvedValue({ data: [] });
-            const result = await getNotifications();
-            expect(mockedApi.get).toHaveBeenCalledWith('/users/me/notifications');
-            expect(result).toEqual([]);
-        });
-
-        it('markNotificationRead should POST /users/me/notifications/:id/read', async () => {
-            (mockedApi.post as any).mockResolvedValue({});
-            await markNotificationRead('n-1');
-            expect(mockedApi.post).toHaveBeenCalledWith('/users/me/notifications/n-1/read');
-        });
-    });
 });

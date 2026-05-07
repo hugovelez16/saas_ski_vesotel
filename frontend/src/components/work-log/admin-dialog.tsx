@@ -102,7 +102,7 @@ export function AdminCreateWorkLogDialog({ users, allUserSettings, onLogUpdate, 
     const selectedUserName = useMemo(() => {
         if (!selectedUserId) return null;
         const user = users.find(u => u.id === selectedUserId);
-        return user ? `${user.first_name} ${user.last_name}` : null;
+        return user ? `${user.firstName} ${user.lastName}` : null;
     }, [selectedUserId, users]);
 
     return (
@@ -137,7 +137,7 @@ export function AdminCreateWorkLogDialog({ users, allUserSettings, onLogUpdate, 
                             <SelectContent>
                                 {users.map((user: any) => (
                                     <SelectItem key={user.id} value={user.id}>
-                                        {user.first_name} {user.last_name}
+                                        {user.firstName} {user.lastName}
                                     </SelectItem>
                                 ))}
                             </SelectContent>

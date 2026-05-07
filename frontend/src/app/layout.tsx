@@ -3,6 +3,8 @@ import "./globals.css";
 import type { Metadata } from 'next';
 import { Providers } from "@/components/providers";
 
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: "Ski Vesotel",
   description: "Gestión de Jornadas de Esquí",

@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 "use client";
 
 import { useAuth } from "@/context/AuthContext";
@@ -194,7 +195,7 @@ export default function ListPage() {
     return result;
   }, [workLogs, filters, sortConfig]);
 
-  const activeCompanyId = currentCompanyId || user?.active_company_id;
+  const activeCompanyId = currentCompanyId || user?.activeCompanyId;
   const activeCompany = useMemo(() => {
     if (!activeCompanyId) return null;
     return companies.find(c => c.id === activeCompanyId);

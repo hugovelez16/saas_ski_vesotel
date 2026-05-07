@@ -71,7 +71,7 @@ export function Sidebar({ navGroups }: { navGroups: NavGroup[] }) {
         enabled: !!user,
     });
 
-    const activeCompany = companies.find(c => c.id === user?.active_company_id);
+    const activeCompany = companies.find(c => c.id === user?.activeCompanyId);
 
     // State to track expanded groups. key = group index
     // Default open all
@@ -103,14 +103,14 @@ export function Sidebar({ navGroups }: { navGroups: NavGroup[] }) {
 
             // Active State Logic
             const [itemPath, itemQuery] = item.href.split('?');
-            let is_active = pathname === itemPath || pathname.startsWith(`${itemPath}/`);
+            let isActive = pathname === itemPath || pathname.startsWith(`${itemPath}/`);
 
-            if (is_active && itemQuery) {
+            if (isActive && itemQuery) {
                 const itemParams = new URLSearchParams(itemQuery);
                 itemParams.forEach((val, key) => {
                     const currentVal = searchParams.get(key);
                     if (currentVal !== val) {
-                        is_active = false;
+                        isActive = false;
                     }
                 });
             }
@@ -122,7 +122,7 @@ export function Sidebar({ navGroups }: { navGroups: NavGroup[] }) {
                     onClick={() => setMobileOpen(false)}
                     className={cn(
                         "flex items-center space-x-3 pl-6 pr-3 py-2 rounded-md transition-colors whitespace-nowrap mb-1",
-                        is_active
+                        isActive
                             ? "bg-primary text-primary-foreground shadow-sm font-medium"
                             : "text-slate-400 hover:bg-slate-800 hover:text-white hover:pl-4 transition-all",
                         !expanded && "justify-center px-0 hover:pl-0"
@@ -176,7 +176,7 @@ export function Sidebar({ navGroups }: { navGroups: NavGroup[] }) {
                             <div className="p-4 flex items-center justify-between border-b border-slate-800">
                                 <div>
                                     <h2 className="font-bold">Menu</h2>
-                                    <p className="text-xs text-slate-400">Hola, {user?.first_name}</p>
+                                    <p className="text-xs text-slate-400">Hola, {user?.firstName}</p>
                                 </div>
                                 <Button variant="ghost" size="icon" onClick={() => setMobileOpen(false)} className="text-white">
                                     <X size={20} />
@@ -202,15 +202,15 @@ export function Sidebar({ navGroups }: { navGroups: NavGroup[] }) {
                             <div className="p-4 border-t border-slate-800">
                                 <Link href="/profile" onClick={() => setMobileOpen(false)} className="flex items-center space-x-3 mb-4 px-3 py-2 rounded-md hover:bg-slate-800 transition-colors">
                                     <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center font-bold flex-shrink-0">
-                                        {user?.first_name?.[0]}
+                                        {user?.firstName?.[0]}
                                     </div>
                                     <div className="min-w-0 flex-1">
-                                        <p className="text-sm font-medium truncate">{user?.first_name}</p>
+                                        <p className="text-sm font-medium truncate">{user?.firstName}</p>
                                         <p className="text-xs text-slate-400 truncate">{user?.email}</p>
                                     </div>
                                 </Link>
 
-                                {user?.is_impersonated && (
+                                {user?.isImpersonated && (
                                     <button 
                                         onClick={stopImpersonation} 
                                         className="flex items-center space-x-3 text-amber-500 w-full px-3 py-2 hover:bg-amber-500/10 rounded-md transition-colors mb-2 bg-amber-500/5"
@@ -229,7 +229,7 @@ export function Sidebar({ navGroups }: { navGroups: NavGroup[] }) {
                                         <span className="text-sm font-medium">Cambiar Contexto</span>
                                         <span className="text-[10px] opacity-70 uppercase tracking-tighter truncate w-full text-left">
                                             {activeCompany ? `${activeCompany.name} • ` : ''}
-                                            {!user?.active_role ? 'Administrador' : (user.active_role === 'manager' ? 'Manager' : 'Trabajador')}
+                                            {!user?.activeRole ? 'Administrador' : (user.activeRole === 'manager' ? 'Manager' : 'Trabajador')}
                                         </span>
                                     </div>
                                 </button>
@@ -335,13 +335,13 @@ export function Sidebar({ navGroups }: { navGroups: NavGroup[] }) {
                                 <span className="text-sm font-medium">Cambiar Contexto</span>
                                 <span className="text-[10px] opacity-50 uppercase font-bold tracking-tighter truncate w-full text-left">
                                     {activeCompany ? `${activeCompany.name} • ` : ''}
-                                    {!user?.active_role ? 'Administrador' : (user.active_role === 'manager' ? 'Manager' : 'Trabajador')}
+                                    {!user?.activeRole ? 'Administrador' : (user.activeRole === 'manager' ? 'Manager' : 'Trabajador')}
                                 </span>
                             </div>
                         )}
                     </button>
 
-                    {user?.is_impersonated && (
+                    {user?.isImpersonated && (
                         <button
                             onClick={stopImpersonation}
                             className={cn(
@@ -358,15 +358,15 @@ export function Sidebar({ navGroups }: { navGroups: NavGroup[] }) {
                     <Link href="/profile" className="flex items-center space-x-3 mb-4 px-3 hover:bg-slate-800 rounded-md py-2 transition-colors cursor-pointer block">
                         {!expanded ? (
                             <div className="w-8 h-8 rounded-full bg-slate-700 mx-auto flex items-center justify-center font-bold">
-                                {user?.first_name?.[0]}
+                                {user?.firstName?.[0]}
                             </div>
                         ) : (
                             <>
                                 <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center font-bold flex-shrink-0">
-                                    {user?.first_name?.[0]}
+                                    {user?.firstName?.[0]}
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                    <p className="text-sm font-medium truncate">{user?.first_name}</p>
+                                    <p className="text-sm font-medium truncate">{user?.firstName}</p>
                                     <p className="text-xs text-slate-500 truncate">{user?.email}</p>
                                 </div>
                             </>

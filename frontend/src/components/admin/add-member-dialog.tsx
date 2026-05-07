@@ -140,7 +140,7 @@ export function AddMemberDialog({ companyId, companyName, existingMembers = [] }
                                                     const isRejected = existingMembers.some(m => m.userId === user.id && m.status === 'rejected');
                                                     return (
                                                         <SelectItem key={user.id} value={user.email}>
-                                                            {user.first_name} {user.last_name} ({user.email})
+                                                            {user.firstName} {user.lastName} ({user.email})
                                                             {isRejected && " (Rejected)"}
                                                         </SelectItem>
                                                     );

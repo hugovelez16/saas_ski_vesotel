@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
@@ -73,7 +74,7 @@ export default function ReportsPage() {
     useEffect(() => {
         if (accessibleCompanies.length > 0 && !selectedCompanyId) {
             // Priority: Active Context > User Default > First Available
-            const targetId = user?.active_company_id || user?.default_company_id;
+            const targetId = user?.activeCompanyId || user?.defaultCompanyId;
             
             if (targetId) {
                 const exists = accessibleCompanies.find(c => c.id === targetId);
@@ -84,7 +85,7 @@ export default function ReportsPage() {
             }
             setSelectedCompanyId(accessibleCompanies[0].id);
         }
-    }, [accessibleCompanies, selectedCompanyId, user?.active_company_id, user?.default_company_id]);
+    }, [accessibleCompanies, selectedCompanyId, user?.activeCompanyId, user?.defaultCompanyId]);
 
     // Fetch members/users
     // If Admin and NO company selected -> Get ALL Users
@@ -108,11 +109,11 @@ export default function ReportsPage() {
             // rawUsers is User[]
             const users = rawUsers as any[]; // Temporary cast as we know the shape but specific import might be missing User type details in this context if not fully aligned. 
             // Actually let's trust the shape:
-            return users.map((u: any) => ({ id: u.id, name: `${u.first_name} ${u.last_name}`, role: u.role, email: u.email }));
+            return users.map((u: any) => ({ id: u.id, name: `${u.firstName} ${u.lastName}`, role: u.role, email: u.email }));
         } else {
             // rawUsers is CompanyMemberResponse[]
             const members = rawUsers as any[];
-            return members.map((m: any) => ({ id: m.userId, name: m.user ? `${m.user.first_name} ${m.user.last_name}` : 'Unknown', role: m.role }));
+            return members.map((m: any) => ({ id: m.userId, name: m.user ? `${m.user.firstName} ${m.user.lastName}` : 'Unknown', role: m.role }));
         }
     }, [rawUsers, isAdmin, selectedCompanyId]);
 
@@ -611,7 +612,7 @@ export default function ReportsPage() {
                         {companies.length > 0 && (
                             <div className="space-y-2">
                                 <Label>Empresa</Label>
-                                <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId} disabled={!!user?.active_company_id}>
+                                <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId} disabled={!!user?.activeCompanyId}>
                                     <SelectTrigger><SelectValue placeholder="Seleccionar empresa" /></SelectTrigger>
                                     <SelectContent>
                                         {accessibleCompanies.map(c => (

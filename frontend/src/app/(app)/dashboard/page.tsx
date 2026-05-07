@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 "use client"
 import { useAuth } from "@/context/AuthContext"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
@@ -39,7 +40,7 @@ export default function DashboardPage() {
 
   // Queries
   const { data: workLogs = [], isLoading: loadingLogs } = useQuery({
-    queryKey: ["workLogs", user?.active_company_id],
+    queryKey: ["workLogs", user?.activeCompanyId],
     queryFn: () => getWorkLogs(),
     enabled: !!user,
   });
@@ -114,7 +115,7 @@ export default function DashboardPage() {
           <OverviewV3
             workLogs={workLogs}
             companies={myCompanies}
-            activeCompanyId={user?.active_company_id}
+            activeCompanyId={user?.activeCompanyId}
             onAddRecord={() => { }}
             onNavigate={setActiveTab}
             selectedDate={selectedDate}

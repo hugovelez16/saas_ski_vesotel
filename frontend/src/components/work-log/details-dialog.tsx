@@ -187,7 +187,7 @@ export function WorkLogDetailsDialog({ log, open, onOpenChange, companies: initi
                     </div>
 
                     {/* Group Action Checkbox - Only for Managers/Admins */}
-                    {log.groupId && (user?.is_platform_admin || company?.role === 'manager' || company?.role === 'admin' || user?.active_role === 'manager') && (
+                    {log.groupId && (user?.isPlatformAdmin || company?.role === 'manager' || company?.role === 'admin' || user?.activeRole === 'manager') && (
                         <div className="flex items-center space-x-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-100 dark:border-blue-800 transition-colors hover:bg-blue-100 dark:hover:bg-blue-900/30">
                             <Checkbox 
                                 id="applyToGroup" 

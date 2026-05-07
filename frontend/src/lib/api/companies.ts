@@ -26,15 +26,7 @@ export const getCompaniesDetailed = async (): Promise<CompanyWithMembers[]> => {
     return response.data;
 };
 
-export const getAvailableCompanies = async (): Promise<CompanyResponse[]> => {
-    const response = await api.get<CompanyResponse[]>("/companies/available");
-    return response.data;
-};
 
-export const joinCompany = async (companyId: string): Promise<CompanyMemberResponse> => {
-    const response = await api.post<CompanyMemberResponse>(`/companies/${companyId}/join`);
-    return response.data;
-};
 
 export const getMyCompanies = async (): Promise<CompanyResponse[]> => {
     const response = await api.get<CompanyResponse[]>("/users/me/companies");
@@ -69,6 +61,3 @@ export const getCompanyMembers = async (companyId: string, status?: string): Pro
     return response.data;
 };
 
-export const notifyCompanyMember = async (companyId: string, userId: string): Promise<void> => {
-    await api.post(`/companies/${companyId}/members/${userId}/notify`);
-};

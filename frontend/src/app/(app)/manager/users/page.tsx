@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -50,7 +51,7 @@ export default function ManagerUsersPage() {
                     map.set(member.userId, {
                         ...member.user,
                         _companyId: company.id,
-                        _status: member.is_active ? 'active' : 'inactive',
+                        _status: member.isActive ? 'active' : 'inactive',
                         _role: member.role
                     });
                 }
@@ -70,9 +71,9 @@ export default function ManagerUsersPage() {
 
     const columns: ColumnDef<any>[] = [
         {
-            accessorKey: "first_name",
+            accessorKey: "firstName",
             header: "Nombre",
-            cell: ({ row }) => `${row.original.first_name} ${row.original.last_name}`,
+            cell: ({ row }) => `${row.original.firstName} ${row.original.lastName}`,
         },
         {
             accessorKey: "email",

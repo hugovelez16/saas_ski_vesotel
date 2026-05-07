@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 "use client";
 
 import { useSearchParams } from "next/navigation";
@@ -54,7 +55,7 @@ export default function ManagerShiftsPage() {
         return selectedCompany.members
             .filter(m => m.user)
             .map(m => ({
-                label: `${m.user!.first_name} ${m.user!.last_name}`,
+                label: `${m.user!.firstName} ${m.user!.lastName}`,
                 value: m.userId
             }));
     }, [selectedCompany]);
@@ -64,7 +65,7 @@ export default function ManagerShiftsPage() {
             const member = selectedCompany?.members.find(m => m.userId === log.userId);
             return {
                 ...log,
-                userName: member ? `${member.user?.first_name} ${member.user?.last_name}` : 'Desconocido',
+                userName: member ? `${member.user?.firstName} ${member.user?.lastName}` : 'Desconocido',
                 userEmail: member?.user?.email
             };
         }).filter(log => {

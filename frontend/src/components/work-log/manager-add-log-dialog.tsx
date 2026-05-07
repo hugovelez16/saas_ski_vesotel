@@ -170,7 +170,7 @@ export function ManagerAddWorkLogDialog({
     const selectedUsersNames = useMemo(() => {
         return selectedUserIds.map(id => {
             const u = users.find(u => u.id === id);
-            return u ? `${u.first_name} ${u.last_name}` : null;
+            return u ? `${u.firstName} ${u.lastName}` : null;
         }).filter(Boolean);
     }, [selectedUserIds, users]);
 
@@ -233,7 +233,7 @@ export function ManagerAddWorkLogDialog({
                                             htmlFor={`user-${u.id}`}
                                             className="text-xs cursor-pointer flex-1"
                                         >
-                                            {u.first_name} {u.last_name}
+                                            {u.firstName} {u.lastName}
                                         </Label>
                                     </div>
                                 ))}

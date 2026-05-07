@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 "use client";
 
 import React from "react";
@@ -81,7 +82,7 @@ export default function CompanyDetailsPage() {
             header: "Usuario",
             cell: ({ row }) => (
                 <div className="flex flex-col">
-                    <span className="font-medium">{row.original.user?.first_name} {row.original.user?.last_name}</span>
+                    <span className="font-medium">{row.original.user?.firstName} {row.original.user?.lastName}</span>
                     <span className="text-xs text-muted-foreground">{row.original.user?.email}</span>
                 </div>
             )
@@ -97,7 +98,7 @@ export default function CompanyDetailsPage() {
                         onClick={(e) => e.stopPropagation()}
                     >
                         <Switch
-                            checked={member.is_active}
+                            checked={member.isActive}
                             onCheckedChange={(checked) => statusMutation.mutate({
                                 userId: member.userId,
                                 status: checked ? 'active' : 'rejected'
@@ -365,7 +366,7 @@ function TaxOverview({ company, isAdmin }: { company: any, isAdmin?: boolean }) 
             header: "Miembro",
             cell: ({ row }) => (
                 <div className="flex flex-col">
-                    <span className="font-medium text-slate-900 dark:text-slate-100">{row.original.user?.first_name} {row.original.user?.last_name}</span>
+                    <span className="font-medium text-slate-900 dark:text-slate-100">{row.original.user?.firstName} {row.original.user?.lastName}</span>
                     <span className="text-[10px] text-muted-foreground uppercase font-mono">{row.original.user?.email}</span>
                 </div>
             )
@@ -459,7 +460,7 @@ function TaxOverview({ company, isAdmin }: { company: any, isAdmin?: boolean }) 
                     userId={editingMember.userId}
                     company={company}
                     member={editingMember}
-                    userName={`${editingMember.user?.first_name} ${editingMember.user?.last_name}`}
+                    userName={`${editingMember.user?.firstName} ${editingMember.user?.lastName}`}
                 />
             )}
         </div>
