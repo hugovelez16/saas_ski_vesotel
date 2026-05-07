@@ -4,7 +4,8 @@ import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
 import { getUserRates } from "@/lib/api/settings";
 import { getMyCompanies } from "@/lib/api/companies";
-import type { WorkLog, UserCompanyRate, Company } from "@/lib/types";
+import type { WorkLog, UserCompanyRate, Company, CompanyMember } from "@/lib/types";
+import { mapMemberToLegacyRate } from "@/lib/utils/rates";
 import {
   Table,
   TableBody,
@@ -72,7 +73,7 @@ export default function ListPage() {
    const fetchSettings = async () => {
     try {
       const [rates, comps] = await Promise.all([getUserRates(), getMyCompanies()]);
-      setUserRates(rates);
+      setUserRates(rates.map(r => mapMemberToLegacyRate(r)));
       setCompanies(comps);
     } catch (error) {
       console.error("Error fetching rates", error);
