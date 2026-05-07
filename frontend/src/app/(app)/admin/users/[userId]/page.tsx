@@ -97,7 +97,7 @@ function CompanyMemberConfigCard({ user, company, onUpdate }: { user: any, compa
         const shiftKeys = Object.keys(worklogDefinitions);
         const initialRates: Record<string, number> = {};
         let isGross = true;
-        let taxOverrides = { ss: null, irpf: 0, extra: 0 };
+        let taxOverrides: { ss: number | null, irpf: number, extra: number } = { ss: null, irpf: 0, extra: 0 };
 
         let foundTaxes = false;
         for (const key of shiftKeys) {
