@@ -126,10 +126,7 @@ export default function ManagerShiftsPage() {
                 </Badge>
             )
         },
-        {
-            accessorKey: "client",
-            header: "Cliente",
-        },
+
         {
             id: "flags",
             header: "Extras",

@@ -44,3 +44,20 @@ Thumbs.db
 
 # Docker
 postgres_data/
+
+# Logs de la aplicación y contenedores
+*.log
+logs/
+
+# Certificados y Proxy (Caddy/Nginx)
+.caddy/
+site/
+certs/
+
+# Datos temporales de Redis (si lo usas fuera de contenedor) 
+dump.rdb
+
+# Archivos de configuración local de MikroTik o backups de red
+*.backup
+*.rsc
+.aider*

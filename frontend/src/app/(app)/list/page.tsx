@@ -37,8 +37,6 @@ export default function ListPage() {
   const [editingLog, setEditingLog] = useState<WorkLog | null>(null);
   const [applyToGroup, setApplyToGroup] = useState(false);
 
-  // ... (existing code)
-
   const [selectedLog, setSelectedLog] = useState<WorkLog | null>(null);
   const [workLogs, setWorkLogs] = useState<WorkLog[]>([]);
   const [userRates, setUserRates] = useState<UserCompanyRate[]>([]);
@@ -72,7 +70,7 @@ export default function ListPage() {
     }
   };
 
-   const fetchSettings = async () => {
+  const fetchSettings = async () => {
     try {
       const [rates, comps] = await Promise.all([getUserRates(), getMyCompanies()]);
       setUserRates(rates.map(r => mapMemberToLegacyRate(r)));
@@ -94,8 +92,6 @@ export default function ListPage() {
     fetchLogs();
   };
 
-
-
   const [filters, setFilters] = useState<Record<string, any>>({});
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
 
@@ -107,8 +103,8 @@ export default function ListPage() {
     if (filters.search) {
       const q = filters.search.toLowerCase();
       result = result.filter(log =>
-        (log.client && log.client.toLowerCase().includes(q)) ||
-        (log.description && log.description.toLowerCase().includes(q))
+        (log.description && log.description.toLowerCase().includes(q)) ||
+        (log.type && log.type.toLowerCase().includes(q))
       );
     }
     if (filters.type && filters.type.length > 0) {
@@ -153,10 +149,6 @@ export default function ListPage() {
           case 'date':
             aVal = a.startDate;
             bVal = b.startDate;
-            break;
-          case 'client':
-            aVal = a.client || "";
-            bVal = b.client || "";
             break;
           case 'description':
             aVal = a.description || "";
@@ -231,7 +223,6 @@ export default function ListPage() {
       options: [
         { label: "Particular", value: "particular" },
         { label: "Tutorial", value: "tutorial" },
-        // Add 'company' if it appears here? Usually particular/tutorial in list
       ]
     },
     {
@@ -265,6 +256,8 @@ export default function ListPage() {
       }
     }
   };
+
+  const totalCols = 7 + dynamicFields.length;
 
   return (
     <div className="space-y-8">
@@ -308,7 +301,6 @@ export default function ListPage() {
       <FilterBar config={filterConfig} onFilterChange={setFilters} />
 
       <div className="rounded-lg border bg-card overflow-hidden">
-
         <Table>
           <TableHeader>
             <TableRow className="bg-slate-900 hover:bg-slate-900 border-none">
@@ -328,10 +320,10 @@ export default function ListPage() {
                   ) : <ArrowUpDown className="h-4 w-4 text-slate-50/50" />}
                 </div>
               </TableHead>
-              <TableHead className="cursor-pointer hover:bg-slate-800 transition-colors text-slate-50" onClick={() => handleSort('client')}>
+              <TableHead className="cursor-pointer hover:bg-slate-800 transition-colors text-slate-50" onClick={() => handleSort('description')}>
                 <div className="flex items-center gap-1">
-                  Client
-                  {sortConfig?.key === 'client' ? (
+                  Description
+                  {sortConfig?.key === 'description' ? (
                     sortConfig.direction === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
                   ) : <ArrowUpDown className="h-4 w-4 text-slate-50/50" />}
                 </div>
@@ -339,9 +331,7 @@ export default function ListPage() {
               {dynamicFields.map(field => (
                 <TableHead key={field} className="text-slate-50 capitalize hidden lg:table-cell">{field}</TableHead>
               ))}
-              <TableHead className="text-slate-50">
-                Flags
-              </TableHead>
+              <TableHead className="text-slate-50">Flags</TableHead>
               <TableHead className="cursor-pointer hover:bg-slate-800 transition-colors text-slate-50" onClick={() => handleSort('duration')}>
                 <div className="flex items-center gap-1">
                   Duration/Days
@@ -364,7 +354,7 @@ export default function ListPage() {
           <TableBody>
             {isLoadingLogs ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-12">
+                <TableCell colSpan={totalCols} className="text-center py-12">
                   <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
                 </TableCell>
               </TableRow>
@@ -383,7 +373,7 @@ export default function ListPage() {
                     if (currentMonth !== prevMonth) {
                       acc.push(
                         <TableRow key={`header-${currentMonth}`} className="bg-muted/50 hover:bg-muted/50">
-                          <TableCell colSpan={7} className="font-semibold text-sm py-2">
+                          <TableCell colSpan={totalCols} className="font-semibold text-sm py-2">
                             {currentMonth}
                           </TableCell>
                         </TableRow>
@@ -397,7 +387,7 @@ export default function ListPage() {
                   if (currentType !== prevType) {
                     acc.push(
                       <TableRow key={`header-${currentType}`} className="bg-muted/50 hover:bg-muted/50">
-                        <TableCell colSpan={7} className="font-semibold text-sm py-2 capitalize">
+                        <TableCell colSpan={totalCols} className="font-semibold text-sm py-2 capitalize">
                           {currentType}
                         </TableCell>
                       </TableRow>
@@ -425,8 +415,8 @@ export default function ListPage() {
                     </TableCell>
                     <TableCell className="capitalize py-2">{log.type}</TableCell>
                     <TableCell className="py-2">
-                      <div className="flex items-center gap-2 max-w-[200px] truncate" title={log.client || ''}>
-                        <span className="truncate">{log.client || '-'}</span>
+                      <div className="flex items-center gap-2 max-w-[200px] truncate" title={log.description || ''}>
+                        <span className="truncate">{log.description || '-'}</span>
                       </div>
                     </TableCell>
                     {dynamicFields.map(field => (
@@ -467,7 +457,7 @@ export default function ListPage() {
                           const msPerDay = 1000 * 60 * 60 * 24;
                           const days = Math.round((end.getTime() - start.getTime()) / msPerDay) + 1;
 
-                          const appliedRate = Number(log.rateApplied) || Number(rate.dailyRate) || 0;
+                          const appliedRate = Number(log.calculationSnapshot?.rate_applied) || Number(rate.dailyRate) || 0;
                           totalGross += days * appliedRate;
 
                           if (log.hasNight) {
@@ -481,7 +471,7 @@ export default function ListPage() {
                           }
                         } else {
                           const duration = Number(log.durationHours) || 0;
-                          const appliedRate = Number(log.rateApplied) || Number(rate.hourlyRate) || 0;
+                          const appliedRate = Number(log.calculationSnapshot?.rate_applied) || Number(rate.hourlyRate) || 0;
                           totalGross += duration * appliedRate;
 
                           if (log.hasNight) {
@@ -510,14 +500,13 @@ export default function ListPage() {
               }, [])
             ) : (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground py-12">
+                <TableCell colSpan={totalCols} className="text-center text-muted-foreground py-12">
                   No records found.
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
-
       </div>
       <WorkLogDetailsDialog
         log={selectedLog}

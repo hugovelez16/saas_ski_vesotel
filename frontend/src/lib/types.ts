@@ -124,7 +124,6 @@ export interface WorkLog {
     // Financials (Unified with Backend)
     netAmount: number;
     grossAmount: number;
-    rateApplied: number;
 
     // Historical Snapshot
     calculationSnapshot?: Record<string, any>;
@@ -132,7 +131,6 @@ export interface WorkLog {
     extraData: Record<string, any>;
     description?: string | null;
     pickupPoint?: string | null;
-    client?: string | null;
     groupId?: string | null;
 
     createdAt: string;
@@ -170,16 +168,12 @@ export interface WorkLogCreate {
     endTime?: string | null;
     description?: string | null;
     pickupPoint?: string | null;
-    client?: string | null;
     extraData?: Record<string, any>;
     amount?: number; // Manual override
     date?: string | null;
     hasCoordination?: boolean;
     hasNight?: boolean;
     arrivesPrior?: boolean;
-    rateApplied?: number;
-    grossAmount?: number;
-    netAmount?: number;
     isGrossCalculation?: boolean;
     groupId?: string | null;
 }

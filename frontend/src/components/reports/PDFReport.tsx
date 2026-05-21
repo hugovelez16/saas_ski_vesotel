@@ -562,7 +562,7 @@ export const PDFReport = ({ workLogs, companies, title, subtitle, dateRange }: P
                                         <Text style={[styles.tableCell, { textTransform: 'capitalize' }]}>{log.type}</Text>
                                     </View>
                                     <View style={styles.colClient}>
-                                        <Text style={styles.tableCell}>{log.client || '-'}</Text>
+                                        <Text style={styles.tableCell}>{log.extraData?.client || log.description || '-'}</Text>
                                     </View>
                                     <View style={[styles.colDetail, { flexDirection: 'row', flexWrap: 'wrap', gap: 2 }]}>
                                         {log.hasCoordination && (

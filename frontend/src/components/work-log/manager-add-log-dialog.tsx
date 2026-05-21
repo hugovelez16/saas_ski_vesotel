@@ -117,11 +117,6 @@ export function ManagerAddWorkLogDialog({
 
         setIsLoading(true);
 
-        if (!formData.client) {
-            toast({ title: "Error", description: "El cliente es obligatorio.", variant: "destructive" });
-            setIsLoading(false);
-            return;
-        }
         if (logType === 'particular' && (!formData.date || !formData.startTime || !formData.endTime)) {
             toast({ title: "Error", description: "Fecha, hora de inicio y fin son obligatorias para el tipo 'Particular'.", variant: "destructive" });
             setIsLoading(false);

@@ -498,7 +498,7 @@ export default function ReportsPage() {
                                 const isLastDay = index === allDays.length - 1;
 
                                 tutorialByDay.set(dateStr, {
-                                    text: `Tutorial: ${log.client || log.description || 'Tutorial'}`,
+                                    text: `Tutorial: ${log.description || 'Tutorial'}`,
                                     hasNight: !!log.hasNight && !isLastDay, // Last day doesn't have night
                                     hasCoord: !!log.hasCoordination
                                 });

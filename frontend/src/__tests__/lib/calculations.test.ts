@@ -13,7 +13,6 @@ function makeLog(overrides: Partial<WorkLog>): WorkLog {
         endDate: '2026-01-15',
         netAmount: 0,
         grossAmount: 0,
-        rateApplied: 0,
         extraData: {},
         createdAt: '2026-01-15T00:00:00Z',
         updatedAt: '2026-01-15T00:00:00Z',

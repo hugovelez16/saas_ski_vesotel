@@ -105,7 +105,7 @@ describe('Work Logs API Client', () => {
 
             const result = await updateWorkLog('wl-1', update);
 
-            expect(mockedApi.put).toHaveBeenCalledWith('/work-logs/wl-1', update);
+            expect(mockedApi.put).toHaveBeenCalledWith('/work-logs/wl-1?apply_to_group=false', update);
             expect(result).toEqual(mockResponse);
         });
     });

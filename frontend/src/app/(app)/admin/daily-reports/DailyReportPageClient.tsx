@@ -241,7 +241,7 @@ export default function DailyReportPage() {
                                                                 }}
                                                                 title={`${log.description || 'Work Log'} (${log.startTime} - ${log.endTime})`}
                                                             >
-                                                                {log.client || log.description || 'Log'}
+                                                                {log.description || log.type}
                                                             </div>
                                                         );
                                                     })}

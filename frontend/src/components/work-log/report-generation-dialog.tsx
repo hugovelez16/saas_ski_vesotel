@@ -133,9 +133,9 @@ export function ReportGenerationDialog({ companies = [], children, open, onOpenC
                     Type: log.type,
                     Description: log.description || '',
                     Hours: log.durationHours || 0,
-                    Rate: log.rateApplied || 0,
+                    Rate: log.calculationSnapshot?.rate_applied || 0,
                     Total: log.amount || 0,
-                    Client: log.client || 'N/A',
+                    Client: log.extraData?.client || 'N/A',
                     Company: companyName
                 };
             });

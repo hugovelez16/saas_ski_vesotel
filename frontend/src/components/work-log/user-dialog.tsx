@@ -106,7 +106,6 @@ export function UserCreateWorkLogDialog({
                     startDate: logToEdit.startDate,
                     endDate: logToEdit.endDate,
                     description: logToEdit.description,
-                    client: logToEdit.client,
                     extraData: logToEdit.extraData || { datos: {}, opciones: {} },
                 });
             } else {

@@ -64,7 +64,7 @@ export function CompanyDashboard({ companyId, companyName }: CompanyDashboardPro
 
             let baseParams = 0;
             if (log.type === 'particular') {
-                baseParams = (Number(log.durationHours) || 0) * (Number(log.rateApplied) || 0);
+                baseParams = (Number(log.durationHours) || 0) * (Number(log.calculationSnapshot?.rate_applied) || 0);
             } else {
                 // Tutorial: rate is daily. We don't have 'days' here easily if not stored?
                 // Actually helper in crud.py uses start/end date.
@@ -94,7 +94,7 @@ export function CompanyDashboard({ companyId, companyName }: CompanyDashboardPro
                     // simple diff in days
                     const diffTime = Math.abs(end.getTime() - start.getTime());
                     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-                    baseParams = diffDays * (Number(log.rateApplied) || 0);
+                    baseParams = diffDays * (Number(log.calculationSnapshot?.rate_applied) || 0);
                 } else {
                     // Fallback if missing dates (shouldn't happen for approved logs)
                     baseParams = Number(log.amount) || 0;

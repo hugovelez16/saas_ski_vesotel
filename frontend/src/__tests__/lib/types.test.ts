@@ -60,7 +60,6 @@ describe('Type Definitions — Compile-time Safety', () => {
             endDate: '2026-01-15',
             netAmount: 100,
             grossAmount: 120,
-            rateApplied: 15,
             extraData: {},
             createdAt: '2026-01-15T00:00:00Z',
             updatedAt: '2026-01-15T00:00:00Z',
@@ -68,7 +67,6 @@ describe('Type Definitions — Compile-time Safety', () => {
 
         expect(log.netAmount).toBe(100);
         expect(log.grossAmount).toBe(120);
-        expect(log.rateApplied).toBe(15);
         expect(log.userId).toBe('u-1');
         expect(log.companyId).toBe('c-1');
     });
@@ -83,7 +81,6 @@ describe('Type Definitions — Compile-time Safety', () => {
             endDate: '2026-01-15',
             netAmount: 0,
             grossAmount: 0,
-            rateApplied: 0,
             extraData: {},
             createdAt: '2026-01-01',
             updatedAt: '2026-01-01',

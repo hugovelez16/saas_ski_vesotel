@@ -119,12 +119,10 @@ class WorkLog(Base):
     
     net_amount = Column(Numeric(10, 2), nullable=True)
     gross_amount = Column(Numeric(10, 2), default=0.0)
-    rate_applied = Column(Numeric(10, 2), nullable=True)
     
     extra_data = Column(JSONB, default={}) # Stores dynamic extras: {"has_night": true, etc.}
     
     description = Column(Text, nullable=True)
-    client = Column(String, nullable=True)
     
     # SaaS Evolution: Historical integrity snapshot
     calculation_snapshot = Column(JSONB, nullable=True)

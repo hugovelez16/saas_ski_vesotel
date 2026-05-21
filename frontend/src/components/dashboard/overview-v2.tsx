@@ -406,9 +406,9 @@ export function OverviewV3({ workLogs, companies, activeCompanyId, onAddRecord, 
                                                 </TableCell>
                                                 <TableCell className="capitalize py-2">{log.type}</TableCell>
                                                 <TableCell className="py-2">
-                                                    <div className="flex items-center gap-2 max-w-[150px] md:max-w-[200px] truncate" title={log.client || ''}>
-                                                        {log.client && <UserIcon className="h-3 w-3 text-muted-foreground shrink-0" />}
-                                                        <span className="truncate block">{log.client || '-'}</span>
+                                                    <div className="flex items-center gap-2 max-w-[150px] md:max-w-[200px] truncate" title={log.extraData?.client || log.description || ''}>
+                                                        {(log.extraData?.client || log.description) && <UserIcon className="h-3 w-3 text-muted-foreground shrink-0" />}
+                                                        <span className="truncate block">{log.extraData?.client || log.description || '-'}</span>
                                                     </div>
                                                 </TableCell>
                                                 {dynamicFields.map(field => (

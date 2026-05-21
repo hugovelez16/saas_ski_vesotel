@@ -191,10 +191,6 @@ export default function ManagerUserDetailsPage({ params }: { params: Promise<{ u
                         aVal = Number(a.amount) || 0;
                         bVal = Number(b.amount) || 0;
                         break;
-                    case 'client':
-                        aVal = a.client || "";
-                        bVal = b.client || "";
-                        break;
                     case 'createdAt':
                         aVal = a.createdAt || "";
                         bVal = b.createdAt || "";
@@ -446,10 +442,6 @@ export default function ManagerUserDetailsPage({ params }: { params: Promise<{ u
                                         )
                                     },
                                     {
-                                        accessorKey: "client",
-                                        header: "Cliente",
-                                    },
-                                    {
                                         id: "flags",
                                         header: "Extras",
                                         cell: ({ row }) => (
@@ -500,8 +492,8 @@ export default function ManagerUserDetailsPage({ params }: { params: Promise<{ u
                                 data={filteredLogs}
                                 onRowClick={setSelectedLog}
                                 isLoading={isLoadingLogs}
-                                searchKey="client"
-                                searchPlaceholder="Buscar por cliente..."
+                                searchKey="type"
+                                searchPlaceholder="Buscar por tipo..."
                             />
                         </CardContent>
                     </Card>

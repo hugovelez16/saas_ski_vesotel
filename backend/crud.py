@@ -353,7 +353,6 @@ def create_work_log(db: Session, work_log: schemas.WorkLogCreate):
         **work_log_data,
         net_amount=calc["net_amount"],
         gross_amount=calc["gross_amount"],
-        rate_applied=calc["rate_applied"],
         duration=calc["duration"],
         calculation_snapshot=calc["snapshot"]
     )
@@ -416,7 +415,6 @@ def create_work_log_bulk(db: Session, work_log_bulk: schemas.WorkLogBulkCreate):
             **individual_log_data,
             net_amount=calc["net_amount"],
             gross_amount=calc["gross_amount"],
-            rate_applied=calc["rate_applied"],
             duration=calc["duration"],
             calculation_snapshot=calc["snapshot"]
         )
@@ -509,7 +507,6 @@ def _update_single_work_log(db: Session, db_work_log: models.WorkLog, work_log: 
         
     db_work_log.net_amount = calc["net_amount"]
     db_work_log.gross_amount = calc["gross_amount"]
-    db_work_log.rate_applied = calc["rate_applied"]
     db_work_log.duration = calc["duration"]
     db_work_log.calculation_snapshot = calc["snapshot"]
     

@@ -34,10 +34,8 @@ class WorkLogBase(CamelModel):
     duration: Optional[float] = None
     net_amount: Optional[float] = Field(None, alias="netAmount")
     gross_amount: Optional[float] = Field(None, alias="grossAmount")
-    rate_applied: Optional[float] = Field(None, alias="rateApplied")
     extra_data: Optional[Dict[str, Any]] = Field(default={}, alias="extraData")
     description: Optional[str] = None
-    client: Optional[str] = None
     company_id: Optional[UUID] = Field(None, alias="companyId")
     group_id: Optional[UUID] = Field(None, alias="groupId")
 
@@ -57,9 +55,8 @@ class WorkLogResponse(WorkLogBase):
     user_id: UUID
     amount: Optional[float] = None
     gross_amount: Optional[float] = Field(None, alias="grossAmount")
-    rate_applied: Optional[float]
-    
-    # SaaS Evolution: Historical snapshot
+
+    # SaaS Evolution: Historical snapshot (includes rate_applied inside snapshot["rate_applied"])
     calculation_snapshot: Optional[Dict[str, Any]] = Field(None, alias="calculationSnapshot")
     
     created_at: datetime

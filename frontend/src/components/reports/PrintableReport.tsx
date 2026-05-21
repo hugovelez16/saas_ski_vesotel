@@ -287,8 +287,8 @@ export function PrintableReport({ workLogs, companies, title, subtitle, dateRang
                                         </TableCell>
                                         <TableCell className="capitalize py-2 text-xs text-slate-600">{log.type}</TableCell>
                                         <TableCell className="py-2 text-xs flex items-center gap-1 text-slate-600">
-                                            {log.client && <UserIcon className="w-3 h-3 text-slate-400" />}
-                                            {log.client || '-'}
+                                            {(log.extraData?.client || log.description) && <UserIcon className="w-3 h-3 text-slate-400" />}
+                                            {log.extraData?.client || log.description || '-'}
                                         </TableCell>
                                         <TableCell className="text-[10px] py-2 hidden md:table-cell print:table-cell">
                                             <div className="flex gap-1">

@@ -52,7 +52,7 @@ export function ExportLogsDialog({ workLogs }: ExportLogsDialogProps) {
             if (selectedColumns.includes('description')) row.Description = log.description;
             if (selectedColumns.includes('duration')) row.Duration = log.durationHours;
             if (selectedColumns.includes('amount')) row.Amount = log.amount;
-            if (selectedColumns.includes('rate')) row['Hourly Rate'] = log.rateApplied;
+            if (selectedColumns.includes('rate')) row['Hourly Rate'] = log.calculationSnapshot?.rate_applied || 0;
             if (selectedColumns.includes('companyName')) row.Company = log.companyId || 'Unknown';
             return row;
         });

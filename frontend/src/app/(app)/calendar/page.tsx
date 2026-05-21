@@ -93,7 +93,7 @@ export default function CalendarPage() {
         end: endTime,
         id: log.id,
         start: startTime,
-        title: log.client || log.description || log.type,
+        title: log.description || log.type,
         extendedProps: log,
       } as CalendarEvent & { extendedProps: any };
     });
