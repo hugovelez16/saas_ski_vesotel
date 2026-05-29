@@ -28,15 +28,34 @@ REFRESH_TOKEN_EXPIRE_DAYS = 30
 # Load RSA Keys
 KEYS_DIR = os.path.join(os.path.dirname(__file__), "keys")
 try:
-    with open(os.path.join(KEYS_DIR, "private_key.pem"), "r") as f:
-        PRIVATE_KEY = f.read()
     with open(os.path.join(KEYS_DIR, "public_key.pem"), "r") as f:
         PUBLIC_KEY = f.read()
-except FileNotFoundError:
+
+    with open(os.path.join(KEYS_DIR, "private_key.pem"), "rb") as f:
+        private_key_data = f.read()
+
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.backends import default_backend
+
+    passphrase = os.getenv("JWT_PRIVATE_KEY_PASSPHRASE")
+    private_key_obj = serialization.load_pem_private_key(
+        private_key_data,
+        password=passphrase.encode() if passphrase else None,
+        backend=default_backend()
+    )
+
+    PRIVATE_KEY = private_key_obj.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption()
+    ).decode("utf-8")
+except (FileNotFoundError, ValueError, TypeError) as e:
     # Fallback for dev/CI if keys don't exist yet (though they should be generated)
     # In production, keys must be managed securely
     PRIVATE_KEY = os.getenv("PRIVATE_KEY", "")
     PUBLIC_KEY = os.getenv("PUBLIC_KEY", "")
+    if not PRIVATE_KEY and not PUBLIC_KEY:
+        raise RuntimeError(f"Failed to load RSA key: {e}")
 
 from redis_config import redis_manager
 
@@ -169,7 +188,8 @@ async def get_current_user(token: str = Depends(get_token_from_request), db: Ses
             company_id=payload.get("cid"),
             company_role=payload.get("role"),
             is_platform_admin=payload.get("is_admin", False),
-            scope=payload.get("scope", "full")
+            scope=payload.get("scope", "full"),
+            admin_user_id=payload.get("admin_user_id")
         )
     except JWTError:
         raise credentials_exception
@@ -183,6 +203,7 @@ async def get_current_user(token: str = Depends(get_token_from_request), db: Ses
     user.active_role = token_data.company_role
     user.is_platform_admin = token_data.is_platform_admin
     user.token_scope = token_data.scope
+    user.admin_user_id = token_data.admin_user_id
     
     return user
 
@@ -228,7 +249,8 @@ async def get_verified_user(token: str = Depends(get_token_from_request), db: Se
             company_id=payload.get("cid"),
             company_role=payload.get("role"),
             is_platform_admin=payload.get("is_admin", False),
-            scope=payload.get("scope", "full")
+            scope=payload.get("scope", "full"),
+            admin_user_id=payload.get("admin_user_id")
         )
     except JWTError:
         raise credentials_exception
@@ -242,6 +264,7 @@ async def get_verified_user(token: str = Depends(get_token_from_request), db: Se
     user.active_role = token_data.company_role
     user.is_platform_admin = token_data.is_platform_admin
     user.token_scope = token_data.scope
+    user.admin_user_id = token_data.admin_user_id
     
     return user
 

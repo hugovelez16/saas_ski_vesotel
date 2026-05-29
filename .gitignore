@@ -61,3 +61,5 @@ dump.rdb
 *.backup
 *.rsc
 .aider*
+.antigravitycli/
+scratch/

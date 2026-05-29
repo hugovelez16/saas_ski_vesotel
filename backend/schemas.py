@@ -224,6 +224,7 @@ class TokenData(CamelModel):
     is_platform_admin: bool = False
     scope: str = "full"
     email: Optional[EmailStr] = None
+    admin_user_id: Optional[str] = None
 
 class SessionResponse(CamelModel):
     id: UUID

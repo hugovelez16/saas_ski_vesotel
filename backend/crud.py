@@ -453,7 +453,7 @@ def update_work_log(db: Session, work_log_id: str, work_log: schemas.WorkLogCrea
         return None
     
     # If apply_to_group is true and we have a group_id
-    group_id = db_work_log.group_id or (db_work_log.extra_data.get('group_id') if db_work_log.extra_data else None)
+    group_id = getattr(db_work_log, 'group_id', None) or (db_work_log.extra_data.get('group_id') if db_work_log.extra_data else None)
     
     if apply_to_group and group_id:
         # Find all logs in the group
