@@ -120,7 +120,7 @@ export default function ManagerUserDetailsPage({ params }: { params: Promise<{ u
 
     // Derived lists based on visibleCompanies
     const visibleRates = useMemo(() => {
-        return memberConfigs.filter((m: any) => visibleCompanies.some((c: any) => c.id === m.companyId));
+        return memberConfigs.filter((m: any) => visibleCompanies.some((c: any) => c.id === m.id));
     }, [memberConfigs, visibleCompanies]);
 
     const visibleWorkLogs = useMemo(() => {
@@ -134,7 +134,7 @@ export default function ManagerUserDetailsPage({ params }: { params: Promise<{ u
         if (!selectedLog) return null;
         if (!memberConfigs || !companies) return null;
 
-        const member = memberConfigs.find((m: any) => m.companyId === selectedLog.companyId);
+        const member = memberConfigs.find((m: any) => m.id === selectedLog.companyId);
         if (!member) return null;
 
         return mapMemberToLegacyRate(member);
@@ -502,7 +502,7 @@ export default function ManagerUserDetailsPage({ params }: { params: Promise<{ u
                 <TabsContent value="rates" className="mt-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {visibleCompanies.map((company: any) => {
-                            const member = visibleRates.find((m: any) => m.companyId === company.id);
+                            const member = visibleRates.find((m: any) => m.id === company.id);
                             if (!member || !member.ratesConfig) return null;
 
                             const worklogDefs = company.worklogDefinitions || {};
