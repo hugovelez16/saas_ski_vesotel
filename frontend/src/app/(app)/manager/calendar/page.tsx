@@ -11,9 +11,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { WorkLogDetailsDialog } from "@/components/work-log/details-dialog";
 import { ManagerAddWorkLogDialog } from "@/components/work-log/manager-add-log-dialog";
-import { getWorkLogs } from "@/lib/api/work-logs";
+import { getWorkLogs, deleteWorkLog } from "@/lib/api/work-logs";
 import { getCompaniesDetailed, getMyCompanies } from "@/lib/api/companies";
 import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 import { mapMemberToLegacyRate } from "@/lib/utils/rates";
 import { Calendar as CalendarIcon, Users, Building2, Loader2 } from "lucide-react";
 
@@ -22,10 +23,12 @@ export default function ManagerCalendarPage() {
     const searchParams = useSearchParams();
     const queryClient = useQueryClient();
     const { user: currentUser } = useAuth();
+    const { toast } = useToast();
 
     const [selectedLogs, setSelectedLogs] = useState<any[]>([]);
     const [isDetailsOpen, setIsDetailsOpen] = useState(false);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
+    const [logToEdit, setLogToEdit] = useState<any>(null);
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
     const [selectedUserIdFilter, setSelectedUserIdFilter] = useState<string>("all");
 
@@ -218,27 +221,54 @@ export default function ManagerCalendarPage() {
                 onOpenChange={setIsDetailsOpen}
                 log={selectedLogs[0]}
                 userSettings={
-                    selectedLogs[0] && selectedCompany
+                    selectedLogs[0] && selectedCompany?.members
                         ? (() => {
                             const m = selectedCompany.members.find((m: any) => m.userId === selectedLogs[0].userId);
                             return m ? mapMemberToLegacyRate(m) : null;
                           })()
                         : null
                 }
+                onEdit={(log) => {
+                    setIsDetailsOpen(false);
+                    setLogToEdit(log);
+                    setIsCreateOpen(true);
+                }}
+                onDelete={async (log) => {
+                    if (confirm("¿Estás seguro de que deseas eliminar este registro de trabajo?")) {
+                        try {
+                            await deleteWorkLog(log.id);
+                            toast({ title: "Éxito", description: "Registro eliminado correctamente." });
+                            setIsDetailsOpen(false);
+                            refetchWorkLogs();
+                            queryClient.invalidateQueries({ queryKey: ["work-logs-daily-manager"] });
+                        } catch (error) {
+                            console.error("Error deleting work log:", error);
+                            toast({ title: "Error", description: "No se pudo eliminar el registro.", variant: "destructive" });
+                        }
+                    }
+                }}
             />
 
-            {/* Add Log Dialog */}
+            {/* Add/Edit Log Dialog */}
             <ManagerAddWorkLogDialog
                 open={isCreateOpen}
-                onOpenChange={setIsCreateOpen}
+                onOpenChange={(open) => {
+                    setIsCreateOpen(open);
+                    if (!open) {
+                        setLogToEdit(null);
+                        setSelectedDate(null);
+                    }
+                }}
                 companyId={selectedCompanyId}
                 companyName={selectedCompany?.name || "Empresa"}
                 worklogDefinitions={selectedCompany?.worklogDefinitions}
                 users={companyMembers}
-                initialData={selectedDate ? { startDate: format(selectedDate, 'yyyy-MM-dd'), date: format(selectedDate, 'yyyy-MM-dd') } : undefined}
+                initialData={logToEdit || (selectedDate ? { startDate: format(selectedDate, 'yyyy-MM-dd'), date: format(selectedDate, 'yyyy-MM-dd') } : undefined)}
                 onSuccess={() => {
                     refetchWorkLogs();
                     queryClient.invalidateQueries({ queryKey: ["work-logs-daily-manager"] });
+                    setLogToEdit(null);
+                    setSelectedDate(null);
                 }}
             >
                 <span className="hidden" />
