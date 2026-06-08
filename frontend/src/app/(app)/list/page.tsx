@@ -522,6 +522,10 @@ export default function ListPage() {
           setSelectedLog(null);
           setEditingLog(log);
         }}
+        onDelete={(log) => {
+          handleDeleteLog(log.id);
+          setSelectedLog(null);
+        }}
       />
     </div>
   );

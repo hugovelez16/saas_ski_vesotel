@@ -869,6 +869,10 @@ export default function ManagerUserDetailsPage({ params }: { params: Promise<{ u
                 open={!!selectedLog}
                 onOpenChange={(open) => !open && setSelectedLog(null)}
                 userSettings={effectiveUserSettings}
+                onDelete={(log) => {
+                    handleDeleteLog(log.id);
+                    setSelectedLog(null);
+                }}
             />
 
             <UserCreateWorkLogDialog

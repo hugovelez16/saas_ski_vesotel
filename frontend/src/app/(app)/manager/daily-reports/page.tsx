@@ -6,7 +6,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, addDays, subDays, isSameDay, parseISO, startOfDay } from "date-fns";
 import { getUsers, getUserCompanies } from "@/lib/api/users";
-import { getWorkLogs } from "@/lib/api/work-logs"; // Assuming same API, simpler to fetch all and filter
+import { getWorkLogs, deleteWorkLog } from "@/lib/api/work-logs"; // Assuming same API, simpler to fetch all and filter
 import { getCompaniesDetailed, getMyCompanies } from "@/lib/api/companies";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -20,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ManagerAddWorkLogDialog } from "@/components/work-log/manager-add-log-dialog";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 
 export default function ManagerDailyReportPage() {
     const { user: currentUser } = useAuth();
@@ -29,6 +30,7 @@ export default function ManagerDailyReportPage() {
     const initialCompanyId = searchParams.get("companyId");
 
     const queryClient = useQueryClient();
+    const { toast } = useToast();
     const [date, setDate] = useState<Date>(new Date());
     const [selectedLog, setSelectedLog] = useState<any>(null);
     const [selectedCompanyId, setSelectedCompanyId] = useState<string>(initialCompanyId || "");
@@ -375,6 +377,19 @@ export default function ManagerDailyReportPage() {
                     setApplyToGroup(group);
                     setSelectedLog(null);
                     // TODO: Implement Edit Dialog here if needed
+                }}
+                onDelete={async (log) => {
+                    if (confirm("¿Estás seguro de que deseas eliminar este registro de trabajo?")) {
+                        try {
+                            await deleteWorkLog(log.id);
+                            toast({ title: "Éxito", description: "Registro eliminado correctamente." });
+                            setSelectedLog(null);
+                            queryClient.invalidateQueries({ queryKey: ["work-logs-daily-manager"] });
+                        } catch (error) {
+                            console.error("Error deleting work log:", error);
+                            toast({ title: "Error", description: "No se pudo eliminar el registro.", variant: "destructive" });
+                        }
+                    }
                 }}
             />
 

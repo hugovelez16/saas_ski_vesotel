@@ -145,11 +145,14 @@ def read_work_logs(
 
 @router.delete("/{work_log_id}")
 def delete_work_log(work_log_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_verified_user)):
-    # Verify ownership
     log = db.query(models.WorkLog).filter(models.WorkLog.id == work_log_id).first()
     if not log:
          raise HTTPException(status_code=404, detail="Work log not found")
-    if str(log.user_id) != str(current_user.id) and not getattr(current_user, "is_platform_admin", False):
+         
+    is_owner = str(log.user_id) == str(current_user.id)
+    is_manager = is_manager_of_company(db, current_user, log.company_id)
+    
+    if not is_owner and not is_manager and not getattr(current_user, "is_platform_admin", False):
          raise HTTPException(status_code=403, detail="Not authorized")
          
     record_impersonation_audit(
