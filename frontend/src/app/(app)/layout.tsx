@@ -56,11 +56,13 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
 
     // Platform Admin Logic: Exclusive visibility
     if (isPlatformAdmin) {
-        // Platform Admin Group - ALWAYS show if they are platform admin
-        navGroups.push({
-            label: "Administración Plataforma",
-            items: adminNavItems
-        });
+        // Platform Admin Group - Show only if we have not switched to manager or worker context
+        if (!activeRole) {
+            navGroups.push({
+                label: "Administración Plataforma",
+                items: adminNavItems
+            });
+        }
 
         // Show Manager/Worker groups ONLY if they have explicitly switched context to one
         if (activeRole === 'manager') {
