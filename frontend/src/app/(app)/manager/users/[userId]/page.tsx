@@ -2,15 +2,15 @@
 export const dynamic = "force-dynamic";
 
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getUsers, getUser, getUserCompanies } from "@/lib/api/users";
 import { getWorkLogs, deleteWorkLog } from "@/lib/api/work-logs";
-import { getMyCompanies } from "@/lib/api/companies";
+import { getMyCompanies, updateCompanyMember } from "@/lib/api/companies";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, Building2, Clock, User as UserIcon, CheckCircle, XCircle, ArrowUp, ArrowDown, ArrowUpDown, ChevronLeft, ChevronRight, Sparkles, Moon, Pencil, Trash2 } from "lucide-react";
+import { Calendar, Building2, Clock, User as UserIcon, CheckCircle, XCircle, ArrowUp, ArrowDown, ArrowUpDown, ChevronLeft, ChevronRight, Sparkles, Moon, Pencil, Trash2, Wallet, Database, Loader2, Shield } from "lucide-react";
 import { format, subMonths, addMonths, parseISO, differenceInCalendarDays } from "date-fns";
 import { DataTable } from "@/components/ui/data-table";
 import { FilterBar, FilterConfig } from "@/components/ui/filter-bar";
@@ -23,6 +23,347 @@ import { User, WorkLog } from "@/lib/types";
 import { OverviewV3 } from "@/components/dashboard/overview-v2";
 import { AnalyticsV2 as AnalyticsV3 } from "@/components/dashboard/analytics-v2";
 import { mapMemberToLegacyRate } from "@/lib/utils/rates";
+import {
+    Form,
+    FormControl,
+    FormDescription,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+
+const numericSchema = z.preprocess(
+    (val) => (val === "" || val === undefined || val === null ? 0 : val),
+    z.coerce.number().min(0)
+);
+
+const memberConfigSchema = z.object({
+    role: z.string(),
+    isActive: z.boolean(),
+    isGross: z.boolean(),
+    rates: z.record(numericSchema),
+    taxOverrides: z.object({
+        ss: z.preprocess(
+            (val) => (val === "" || val === undefined ? null : val),
+            z.coerce.number().min(0).max(100).optional().nullable()
+        ),
+        irpf: z.preprocess(
+            (val) => (val === "" || val === undefined || val === null ? 0 : val),
+            z.coerce.number().min(0).max(100)
+        ),
+        extra: z.preprocess(
+            (val) => (val === "" || val === undefined || val === null ? 0 : val),
+            z.coerce.number().min(0).max(100)
+        ),
+    })
+});
+
+type MemberConfigValues = z.infer<typeof memberConfigSchema>;
+
+function CompanyMemberConfigCard({ user, company, onUpdate }: { user: any, company: any, onUpdate: () => void }) {
+    const { toast } = useToast();
+    const worklogDefinitions = company.worklogDefinitions || {};
+    const ratesConfig = company.ratesConfig || {};
+
+    const form = useForm<MemberConfigValues>({
+        resolver: zodResolver(memberConfigSchema),
+        defaultValues: {
+            role: company.role || "worker",
+            isActive: company.isActiveMember ?? true,
+            isGross: true,
+            rates: {},
+            taxOverrides: {
+                ss: null,
+                irpf: 0,
+                extra: 0,
+            }
+        }
+    });
+
+    useEffect(() => {
+        const shiftKeys = Object.keys(worklogDefinitions);
+        const initialRates: Record<string, number> = {};
+        let isGross = true;
+        let taxOverrides: { ss: number | null, irpf: number, extra: number } = { ss: null, irpf: 0, extra: 0 };
+
+        let foundTaxes = false;
+        for (const key of shiftKeys) {
+            const shiftData = ratesConfig[key];
+            if (shiftData && typeof shiftData === 'object') {
+                initialRates[key] = shiftData.base_rate || 0;
+                if (!foundTaxes) {
+                    isGross = shiftData.is_gross !== undefined ? shiftData.is_gross : true;
+                    if (shiftData.tax_overrides) {
+                        taxOverrides = {
+                            ss: (shiftData.tax_overrides.ss !== undefined && shiftData.tax_overrides.ss !== null) ? parseFloat((shiftData.tax_overrides.ss * 100).toFixed(4)) : null,
+                            irpf: parseFloat(((shiftData.tax_overrides.irpf || 0) * 100).toFixed(4)),
+                            extra: parseFloat(((shiftData.tax_overrides.extra || 0) * 100).toFixed(4)),
+                        };
+                        foundTaxes = true;
+                    }
+                }
+            } else {
+                initialRates[key] = 0;
+            }
+        }
+
+        form.reset({
+            role: company.role || "worker",
+            isActive: company.isActiveMember ?? true,
+            isGross,
+            rates: initialRates,
+            taxOverrides
+        });
+    }, [company, worklogDefinitions, ratesConfig, form]);
+
+    const mutation = useMutation({
+        mutationFn: (data: any) => updateCompanyMember(company.id, user.id, data),
+        onSuccess: () => {
+            toast({ title: "Configuración actualizada" });
+            onUpdate();
+        },
+        onError: () => toast({ title: "Error al actualizar", variant: "destructive" })
+    });
+
+    function onSubmit(values: MemberConfigValues) {
+        const newRatesConfig: Record<string, any> = {};
+        const shiftKeys = Object.keys(worklogDefinitions);
+
+        for (const key of shiftKeys) {
+            newRatesConfig[key] = {
+                base_rate: Number(values.rates[key]) || 0,
+                is_gross: values.isGross,
+                tax_overrides: {
+                    ss: values.taxOverrides.ss !== null ? Number(values.taxOverrides.ss) / 100 : null,
+                    irpf: Number(values.taxOverrides.irpf) / 100,
+                    extra: Number(values.taxOverrides.extra) / 100
+                }
+            };
+        }
+
+        mutation.mutate({
+            role: values.role,
+            isActive: values.isActive,
+            ratesConfig: newRatesConfig
+        });
+    }
+
+    const onFormError = (errors: any) => {
+        console.error("Form validation errors:", errors);
+        toast({
+            title: "Error de validación",
+            description: "Por favor, revisa los campos del formulario.",
+            variant: "destructive"
+        });
+    };
+
+    return (
+        <Card className="border-indigo-100 dark:border-indigo-900 shadow-sm overflow-hidden bg-white/50 dark:bg-slate-950/50 backdrop-blur-sm">
+            <CardHeader className="flex flex-row items-center justify-between bg-indigo-50/30 dark:bg-indigo-950/10 border-b">
+                <div className="flex items-center gap-2">
+                    <Building2 className="h-5 w-5 text-indigo-600" />
+                    <div>
+                        <CardTitle className="text-lg">{company.name}</CardTitle>
+                        <CardDescription className="text-xs">ID: {company.id}</CardDescription>
+                    </div>
+                </div>
+                <div className="flex items-center gap-3">
+                    <Badge variant={company.isActiveMember ? 'default' : 'secondary'}>
+                        {company.isActiveMember ? 'Activo' : 'Inactivo'}
+                    </Badge>
+                    <Badge variant="outline" className="capitalize">{company.role}</Badge>
+                </div>
+            </CardHeader>
+            <CardContent className="pt-6">
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit, onFormError)} className="space-y-8">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="md:col-span-1 space-y-4">
+                                <h3 className="text-sm font-semibold flex items-center gap-2 text-indigo-600">
+                                    <Shield className="h-4 w-4" />
+                                    Membresía
+                                </h3>
+                                <FormField
+                                    control={form.control}
+                                    name="role"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel className="text-xs uppercase text-muted-foreground font-bold tracking-wider">Rol en Empresa</FormLabel>
+                                            <Select onValueChange={field.onChange} value={field.value}>
+                                                <FormControl>
+                                                    <SelectTrigger className="h-9">
+                                                        <SelectValue placeholder="Seleccionar rol" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    <SelectItem value="worker">Trabajador</SelectItem>
+                                                    <SelectItem value="manager">Gestor / Supervisor</SelectItem>
+                                                    <SelectItem value="admin">Administrador Empresa</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                <FormField
+                                    control={form.control}
+                                    name="isActive"
+                                    render={({ field }) => (
+                                        <FormItem className="flex flex-row items-center justify-between rounded-md border bg-slate-50 dark:bg-slate-900 px-3 py-2">
+                                            <div className="space-y-0.5">
+                                                <FormLabel className="text-sm">Usuario Activo</FormLabel>
+                                                <FormDescription className="text-[10px]">Permitir registros</FormDescription>
+                                            </div>
+                                            <FormControl>
+                                                <Switch checked={field.value} onCheckedChange={field.onChange} />
+                                            </FormControl>
+                                        </FormItem>
+                                    )}
+                                />
+                            </div>
+
+                            <div className="md:col-span-2 space-y-4">
+                                <h3 className="text-sm font-semibold flex items-center gap-2 text-indigo-600">
+                                    <Wallet className="h-4 w-4" />
+                                    Tarifas por Turno
+                                </h3>
+                                <div className="grid grid-cols-2 gap-4">
+                                    {Object.entries(worklogDefinitions).map(([key, def]: [string, any]) => (
+                                        <FormField
+                                            key={key}
+                                            control={form.control}
+                                            name={`rates.${key}`}
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel className="text-xs uppercase text-muted-foreground font-bold tracking-wider">{def.label}</FormLabel>
+                                                    <FormControl>
+                                                        <div className="relative">
+                                                            <span className="absolute left-3 top-2 text-muted-foreground text-xs">€</span>
+                                                            <Input 
+                                                                type="number" 
+                                                                step="0.01" 
+                                                                {...field} 
+                                                                value={field.value ?? ""} 
+                                                                onChange={field.onChange}
+                                                                className="pl-7 h-9" 
+                                                            />
+                                                        </div>
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4 border-t pt-6">
+                            <div className="flex items-center justify-between mb-2">
+                                <h3 className="text-sm font-semibold flex items-center gap-2 text-indigo-600">
+                                    <Database className="h-4 w-4" />
+                                    Impuestos y Deducciones (Per-User)
+                                </h3>
+                                <FormField
+                                    control={form.control}
+                                    name="isGross"
+                                    render={({ field }) => (
+                                        <FormItem className="flex flex-row items-center gap-2 space-y-0">
+                                            <FormLabel className="text-xs font-bold text-muted-foreground uppercase">Sobre Bruto</FormLabel>
+                                            <FormControl>
+                                                <Switch checked={field.value} onCheckedChange={field.onChange} />
+                                            </FormControl>
+                                        </FormItem>
+                                    )}
+                                />
+                            </div>
+
+                            {form.watch("isGross") && (
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                    <FormField
+                                        control={form.control}
+                                        name="taxOverrides.ss"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel className="text-xs font-bold text-muted-foreground">SS (%)</FormLabel>
+                                                <FormControl>
+                                                    <Input
+                                                        type="number"
+                                                        step="0.0001"
+                                                        placeholder="Defecto"
+                                                        value={field.value ?? ""}
+                                                        onChange={e => field.onChange(e.target.value === "" ? null : Number(e.target.value))}
+                                                        className="h-9"
+                                                    />
+                                                </FormControl>
+                                                <FormDescription className="text-[10px]">Vacío para usar global</FormDescription>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={form.control}
+                                        name="taxOverrides.irpf"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel className="text-xs font-bold text-muted-foreground">IRPF (%)</FormLabel>
+                                                <FormControl>
+                                                    <Input 
+                                                        type="number" 
+                                                        step="0.0001" 
+                                                        {...field} 
+                                                        value={field.value ?? ""} 
+                                                        onChange={field.onChange}
+                                                        className="h-9" 
+                                                    />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={form.control}
+                                        name="taxOverrides.extra"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel className="text-xs font-bold text-muted-foreground">EXTRA (%)</FormLabel>
+                                                <FormControl>
+                                                    <Input 
+                                                        type="number" 
+                                                        step="0.0001" 
+                                                        {...field} 
+                                                        value={field.value ?? ""} 
+                                                        onChange={e => field.onChange(e.target.value === "" ? 0 : Number(e.target.value))}
+                                                        className="h-9" 
+                                                    />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex justify-end pt-2">
+                            <Button type="submit" disabled={mutation.isPending} className="bg-indigo-600 hover:bg-indigo-700 shadow-md transition-all">
+                                {mutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Pencil className="mr-2 h-4 w-4" />}
+                                Actualizar Configuración en {company.name}
+                            </Button>
+                        </div>
+                    </form>
+                </Form>
+            </CardContent>
+        </Card>
+    );
+}
 
 export default function ManagerUserDetailsPage({ params }: { params: Promise<{ userId: string }> }) {
     const { userId } = use(params);
@@ -500,55 +841,19 @@ export default function ManagerUserDetailsPage({ params }: { params: Promise<{ u
                 </TabsContent>
 
                 <TabsContent value="rates" className="mt-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {visibleCompanies.map((company: any) => {
-                            const member = visibleRates.find((m: any) => m.id === company.id);
-                            if (!member || !member.ratesConfig) return null;
-
-                            const worklogDefs = company.worklogDefinitions || {};
-                            const firstRate = Object.values(member.ratesConfig)[0] as any;
-
-                            return (
-                                <Card key={company.id} className="overflow-hidden border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-950/50 backdrop-blur-sm">
-                                    <div className="bg-slate-900 px-4 py-3 text-white flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <Building2 className="h-5 w-5 text-indigo-400" />
-                                            <span className="font-bold">{company.name}</span>
-                                        </div>
-                                    </div>
-                                    <CardContent className="p-4 space-y-4">
-                                        <div className="grid grid-cols-2 gap-4">
-                                            {Object.keys(member.ratesConfig).map((key) => (
-                                                <div key={key} className="space-y-1">
-                                                    <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold truncate" title={worklogDefs[key]?.label || key}>
-                                                        {worklogDefs[key]?.label || key}
-                                                    </p>
-                                                    <p className="text-lg font-bold">€{Number(member.ratesConfig[key]?.base_rate || 0).toFixed(2)}</p>
-                                                </div>
-                                            ))}
-                                        </div>
-
-                                        <div className="pt-4 border-t border-slate-200 dark:border-slate-800 grid grid-cols-3 gap-2">
-                                            <div className="flex flex-col items-center p-2 rounded-lg bg-slate-100 dark:bg-slate-900">
-                                                <span className="text-[10px] text-muted-foreground uppercase font-bold">Base</span>
-                                                <Badge variant="outline" className="mt-1 text-[10px]">{firstRate?.is_gross ? "Bruto" : "Neto"}</Badge>
-                                            </div>
-                                            <div className="flex flex-col items-center p-2 rounded-lg bg-slate-100 dark:bg-slate-900">
-                                                <span className="text-[10px] text-muted-foreground uppercase font-bold">IRPF</span>
-                                                <span className="text-sm font-bold mt-1 text-red-500">{(firstRate?.tax_overrides?.irpf || 0) * 100}%</span>
-                                            </div>
-                                            <div className="flex flex-col items-center p-2 rounded-lg bg-slate-100 dark:bg-slate-900">
-                                                <span className="text-[10px] text-muted-foreground uppercase font-bold">SS</span>
-                                                <span className="text-sm font-bold mt-1 text-blue-500">
-                                                    {firstRate?.tax_overrides?.ss !== undefined && firstRate?.tax_overrides?.ss !== null ? `${firstRate.tax_overrides.ss * 100}%` : "Default"}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            );
-                        })}
-                        {visibleRates.length === 0 && (
+                    <div className="grid gap-8">
+                        {visibleCompanies.map((company: any) => (
+                            <CompanyMemberConfigCard 
+                                key={company.id}
+                                user={user} 
+                                company={company} 
+                                onUpdate={() => {
+                                    queryClient.invalidateQueries({ queryKey: ["userCompanies", userId] });
+                                    queryClient.invalidateQueries({ queryKey: ["userMemberConfigs", userId] });
+                                }} 
+                            />
+                        ))}
+                        {visibleCompanies.length === 0 && (
                             <div className="col-span-full text-center text-muted-foreground py-12 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-dashed border-slate-300 dark:border-slate-700">
                                 <Building2 className="h-12 w-12 mx-auto mb-4 opacity-20" />
                                 <p className="font-medium text-lg">Sin tarifas configuradas</p>
