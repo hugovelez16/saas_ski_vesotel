@@ -50,32 +50,6 @@ export function WorkLogForm({ formData, setFormData, logType, setLogType, compan
 
     const currentDefinition = worklogDefinitions[logType] || null;
 
-    // Generate time options from 00:00 to 23:45 in 15-minute increments (24h format)
-    const timeOptions = React.useMemo(() => {
-        const baseOptions = [];
-        for (let hour = 0; hour < 24; hour++) {
-            for (let minute = 0; minute < 60; minute += 15) {
-                const hh = hour.toString().padStart(2, '0');
-                const mm = minute.toString().padStart(2, '0');
-                baseOptions.push(`${hh}:${mm}`);
-            }
-        }
-        
-        // Add current values if they are not in 15min intervals
-        const extraOptions = [];
-        if (formData.startTime && !baseOptions.includes(formData.startTime)) {
-            extraOptions.push(formData.startTime);
-        }
-        if (formData.endTime && !baseOptions.includes(formData.endTime)) {
-            extraOptions.push(formData.endTime);
-        }
-        
-        if (extraOptions.length > 0) {
-            return [...baseOptions, ...extraOptions].sort();
-        }
-        return baseOptions;
-    }, [formData.startTime, formData.endTime]);
-
     useEffect(() => {
         console.log("DEBUG: WorkLogForm Render", {
             companyName: selectedCompany?.name,
@@ -217,39 +191,11 @@ export function WorkLogForm({ formData, setFormData, logType, setLogType, compan
                         <>
                             <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-2 sm:gap-4">
                                 <Label htmlFor="startTime" className="text-left sm:text-right">Hora Inicio</Label>
-                                <Select 
-                                    value={formData.startTime || undefined} 
-                                    onValueChange={(val) => setFormData(prev => ({ ...prev, startTime: val }))}
-                                >
-                                    <SelectTrigger id="startTime" className="w-full sm:col-span-3 bg-white dark:bg-slate-950">
-                                        <SelectValue placeholder="Selecciona hora de inicio" />
-                                    </SelectTrigger>
-                                    <SelectContent className="max-h-[300px]">
-                                        {timeOptions.map((time) => (
-                                            <SelectItem key={time} value={time}>
-                                                {time}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <Input id="startTime" name="startTime" type="time" className="w-full sm:col-span-3" value={formData.startTime || ''} onChange={handleInputChange} />
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-2 sm:gap-4">
                                 <Label htmlFor="endTime" className="text-left sm:text-right">Hora Fin</Label>
-                                <Select 
-                                    value={formData.endTime || undefined} 
-                                    onValueChange={(val) => setFormData(prev => ({ ...prev, endTime: val }))}
-                                >
-                                    <SelectTrigger id="endTime" className="w-full sm:col-span-3 bg-white dark:bg-slate-950">
-                                        <SelectValue placeholder="Selecciona hora de fin" />
-                                    </SelectTrigger>
-                                    <SelectContent className="max-h-[300px]">
-                                        {timeOptions.map((time) => (
-                                            <SelectItem key={time} value={time}>
-                                                {time}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <Input id="endTime" name="endTime" type="time" className="w-full sm:col-span-3" value={formData.endTime || ''} onChange={handleInputChange} />
                             </div>
                         </>
                     )}
