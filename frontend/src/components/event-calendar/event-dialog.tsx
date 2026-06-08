@@ -126,7 +126,7 @@ export function EventDialog({
         const value = `${formattedHour}:${formattedMinute}`;
         // Use a fixed date to avoid unnecessary date object creations
         const date = new Date(2000, 0, 1, hour, minute);
-        const label = format(date, "h:mm a");
+        const label = format(date, "HH:mm");
         options.push({ label, value });
       }
     }

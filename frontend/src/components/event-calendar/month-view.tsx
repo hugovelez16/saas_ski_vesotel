@@ -186,7 +186,7 @@ export function MonthView({
                                     <span>
                                       {format(
                                         new Date(event.start),
-                                        "h:mm",
+                                        "HH:mm",
                                       )}{" "}
                                     </span>
                                   )}

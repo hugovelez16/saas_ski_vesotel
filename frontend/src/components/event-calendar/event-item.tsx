@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 // 'a' - am/pm
 // ':mm' - minutes with leading zero (only if the token 'mm' is present)
 const formatTimeWithOptionalMinutes = (date: Date) => {
-  return format(date, getMinutes(date) === 0 ? "ha" : "h:mma").toLowerCase();
+  return format(date, "HH:mm");
 };
 
 interface EventWrapperProps {
