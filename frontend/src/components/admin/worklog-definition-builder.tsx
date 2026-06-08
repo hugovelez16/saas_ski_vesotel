@@ -34,7 +34,12 @@ export function WorklogDefinitionBuilder({ initialValue, onSave }: WorklogDefini
         const newObj: Record<string, any> = {};
         types.forEach(t => {
             if (t.key.trim() !== "") {
-                newObj[t.key] = t.data;
+                const finalData = { ...t.data };
+                if (!finalData.unit) {
+                    finalData.unit = finalData.is_range ? "days" : "hours";
+                }
+                finalData.is_range = finalData.unit === "days";
+                newObj[t.key] = finalData;
             }
         });
         onSave(newObj);
