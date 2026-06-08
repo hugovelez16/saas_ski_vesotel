@@ -56,7 +56,7 @@ export function ManagerAddWorkLogDialog({
     const setOpen = isControlled ? setExternalOpen! : setInternalOpen;
 
     const [isLoading, setIsLoading] = useState(false);
-    const [logType, setLogType] = useState<'particular' | 'tutorial'>('particular');
+    const [logType, setLogType] = useState<string>('particular');
     const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -97,7 +97,7 @@ export function ManagerAddWorkLogDialog({
             }
 
             if (initialData?.type) {
-                setLogType(initialData.type as 'particular' | 'tutorial');
+                setLogType(initialData.type);
             }
         } else {
             // Only reset if closing (and we want to clear)
@@ -128,15 +128,27 @@ export function ManagerAddWorkLogDialog({
 
         setIsLoading(true);
 
-        if (logType === 'particular' && (!formData.date || !formData.startTime || !formData.endTime)) {
-            toast({ title: "Error", description: "Fecha, hora de inicio y fin son obligatorias para el tipo 'Particular'.", variant: "destructive" });
-            setIsLoading(false);
-            return;
-        }
-        if (logType === 'tutorial' && (!formData.startDate || !formData.endDate)) {
-            toast({ title: "Error", description: "Fecha de inicio y fin son obligatorias para el tipo 'Tutorial'.", variant: "destructive" });
-            setIsLoading(false);
-            return;
+        const currentDef = (worklogDefinitions || {})[logType] || null;
+        const isRange = currentDef?.is_range === true;
+        const isFixed = currentDef?.unit === "fixed";
+
+        if (isRange) {
+            if (!formData.startDate || !formData.endDate) {
+                toast({ title: "Error", description: "Fecha de inicio y fin son obligatorias.", variant: "destructive" });
+                setIsLoading(false);
+                return;
+            }
+        } else {
+            if (!formData.date) {
+                toast({ title: "Error", description: "La fecha es obligatoria.", variant: "destructive" });
+                setIsLoading(false);
+                return;
+            }
+            if (!isFixed && (!formData.startTime || !formData.endTime)) {
+                toast({ title: "Error", description: "Las horas de inicio y fin son obligatorias.", variant: "destructive" });
+                setIsLoading(false);
+                return;
+            }
         }
 
         const sharedData: any = {
@@ -146,8 +158,8 @@ export function ManagerAddWorkLogDialog({
         };
 
         // SaaS Logic: Ensure startDate/endDate are present for all types
-        // In 'particular' (single day) mode, they should match 'date'
-        if (logType === 'particular' || !sharedData.startDate) {
+        // In non-range mode, they should match 'date'
+        if (!isRange) {
             sharedData.startDate = sharedData.date;
             sharedData.endDate = sharedData.date;
         }
