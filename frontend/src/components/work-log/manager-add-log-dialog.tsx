@@ -23,11 +23,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { X } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { Input } from "@/components/ui/input";
 
 interface ManagerAddWorkLogDialogProps {
     companyId: string;
     companyName: string;
     users: any[];
+    worklogDefinitions?: Record<string, any>;
     onSuccess?: () => void;
     children?: React.ReactNode;
     open?: boolean;
@@ -39,6 +41,7 @@ export function ManagerAddWorkLogDialog({
     companyId,
     companyName,
     users,
+    worklogDefinitions,
     onSuccess,
     children,
     open: externalOpen,
@@ -55,6 +58,7 @@ export function ManagerAddWorkLogDialog({
     const [isLoading, setIsLoading] = useState(false);
     const [logType, setLogType] = useState<'particular' | 'tutorial'>('particular');
     const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+    const [searchQuery, setSearchQuery] = useState('');
 
     // Form data - pre-fill companyId
     const [formData, setFormData] = useState<Partial<WorkLogCreate>>({
@@ -70,6 +74,7 @@ export function ManagerAddWorkLogDialog({
     // Reset or Initialize when opening
     useEffect(() => {
         if (open) {
+            setSearchQuery('');
             setFormData(prev => ({
                 ...prev,
                 companyId: companyId,
@@ -102,12 +107,18 @@ export function ManagerAddWorkLogDialog({
                 setFormData({ companyId: companyId, hasCoordination: false, hasNight: false, arrivesPrior: false });
                 setSelectedUserIds([]);
                 setLogType('particular');
+                setSearchQuery('');
             }
         }
     }, [open, companyId, initialData, isControlled]);
 
-    // Mock company object for WorkLogForm
-    const companies = useMemo(() => [{ id: companyId, name: companyName, settings: {} }], [companyId, companyName]);
+    // Mock company object for WorkLogForm (passing worklogDefinitions)
+    const companies = useMemo(() => [{ 
+        id: companyId, 
+        name: companyName, 
+        settings: {},
+        worklogDefinitions: worklogDefinitions || {}
+    }], [companyId, companyName, worklogDefinitions]);
 
     const handleSubmit = async () => {
         if (selectedUserIds.length === 0) {
@@ -195,6 +206,16 @@ export function ManagerAddWorkLogDialog({
         );
     };
 
+    const filteredUsers = useMemo(() => {
+        if (!searchQuery.trim()) return users;
+        const query = searchQuery.toLowerCase();
+        return users.filter(u => 
+            (u.firstName || '').toLowerCase().includes(query) || 
+            (u.lastName || '').toLowerCase().includes(query) || 
+            (u.email || '').toLowerCase().includes(query)
+        );
+    }, [users, searchQuery]);
+
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
@@ -205,7 +226,7 @@ export function ManagerAddWorkLogDialog({
                     </Button>
                 )}
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+            <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto bg-white dark:bg-slate-950">
                 <DialogHeader>
                     <DialogTitle>Añadir Registro - {companyName}</DialogTitle>
                     <DialogDescription>
@@ -216,7 +237,7 @@ export function ManagerAddWorkLogDialog({
                 <div className="grid gap-4 py-4">
                     <div className="grid gap-2">
                         <Label>Usuarios seleccionados ({selectedUserIds.length})</Label>
-                        <div className="flex flex-wrap gap-2 border p-2 rounded-md min-h-[40px] bg-slate-50">
+                        <div className="flex flex-wrap gap-2 border p-2 rounded-md min-h-[40px] bg-slate-50 dark:bg-slate-900">
                             {selectedUsersNames.length > 0 ? (
                                 selectedUsersNames.map((name, idx) => (
                                     <Badge key={idx} variant="secondary" className="flex items-center gap-1 py-1">
@@ -233,10 +254,16 @@ export function ManagerAddWorkLogDialog({
                         </div>
 
                         <Label className="mt-2">Seleccionar miembros</Label>
-                        <div className="h-[120px] w-full border rounded-md p-2 overflow-y-auto">
+                        <Input
+                            placeholder="Buscar usuario por nombre o email..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="h-8 text-xs my-1"
+                        />
+                        <div className="h-[120px] w-full border rounded-md p-2 overflow-y-auto bg-white dark:bg-slate-950">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                {users.map((u: any) => (
-                                    <div key={u.id} className="flex items-center space-x-2 p-1 hover:bg-slate-100 rounded transition-colors">
+                                {filteredUsers.map((u: any) => (
+                                    <div key={u.id} className="flex items-center space-x-2 p-1 hover:bg-slate-100 dark:hover:bg-slate-900 rounded transition-colors">
                                         <Checkbox 
                                             id={`user-${u.id}`} 
                                             checked={selectedUserIds.includes(u.id)}
@@ -244,12 +271,18 @@ export function ManagerAddWorkLogDialog({
                                         />
                                         <Label 
                                             htmlFor={`user-${u.id}`}
-                                            className="text-xs cursor-pointer flex-1"
+                                            className="text-xs cursor-pointer flex-1 truncate"
+                                            title={`${u.firstName} ${u.lastName}`}
                                         >
                                             {u.firstName} {u.lastName}
                                         </Label>
                                     </div>
                                 ))}
+                                {filteredUsers.length === 0 && (
+                                    <span className="col-span-full text-center text-xs text-muted-foreground py-4 italic">
+                                        No se encontraron usuarios
+                                    </span>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -261,6 +294,7 @@ export function ManagerAddWorkLogDialog({
                         logType={logType}
                         setLogType={setLogType as any}
                         companies={companies}
+                        hideCompanySelector={true}
                     />
                 </div>
 

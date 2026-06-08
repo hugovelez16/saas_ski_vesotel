@@ -31,9 +31,10 @@ interface WorkLogFormProps {
     setLogType: (type: string) => void;
     companies: any[];
     defaultCompanyId?: string | null;
+    hideCompanySelector?: boolean;
 }
 
-export function WorkLogForm({ formData, setFormData, logType, setLogType, companies, defaultCompanyId }: WorkLogFormProps) {
+export function WorkLogForm({ formData, setFormData, logType, setLogType, companies, defaultCompanyId, hideCompanySelector }: WorkLogFormProps) {
     const [isCalendarOpen, setIsCalendarOpen] = useState(false);
     const { user } = useAuth();
 
@@ -132,7 +133,7 @@ export function WorkLogForm({ formData, setFormData, logType, setLogType, compan
 
     return (
         <div className="grid gap-4 py-4">
-            {(!user?.activeCompanyId || user?.isPlatformAdmin) && (
+            {!hideCompanySelector && (!user?.activeCompanyId || user?.isPlatformAdmin) && (
                 <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-2 sm:gap-4">
                     <Label className="text-left sm:text-right">Empresa</Label>
                     <Select value={formData.companyId} onValueChange={handleCompanyChange}>

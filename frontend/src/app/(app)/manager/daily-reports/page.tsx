@@ -386,6 +386,7 @@ export default function ManagerDailyReportPage() {
                     initialData={createLogState.data}
                     companyId={selectedCompanyId || ""}
                     companyName={managedCompanies.find(c => c.id === selectedCompanyId)?.name || "Company"}
+                    worklogDefinitions={managedCompanies.find(c => c.id === selectedCompanyId)?.worklogDefinitions}
                     users={companyUsers}
                     onSuccess={() => {
                         queryClient.invalidateQueries({ queryKey: ["work-logs-daily-manager"] });
