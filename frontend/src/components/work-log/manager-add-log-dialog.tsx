@@ -168,7 +168,7 @@ export function ManagerAddWorkLogDialog({
                 await api.put(`/work-logs/${initialData.id}`, { ...sharedData, userId: selectedUserIds[0] });
                 toast({ title: "Éxito", description: "Registro actualizado correctamente." });
             } else if (selectedUserIds.length === 1) {
-                await api.post("/work-logs/", { ...sharedData, userId: selectedUserIds[0] });
+                await api.post("/work-logs", { ...sharedData, userId: selectedUserIds[0] });
                 toast({ title: "Éxito", description: "Registro añadido correctamente." });
             } else {
                 const bulkData: WorkLogBulkCreate = {

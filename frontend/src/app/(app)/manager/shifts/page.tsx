@@ -42,7 +42,7 @@ export default function ManagerShiftsPage() {
     const { data: workLogs = [], isLoading: loadingLogs } = useQuery({
         queryFn: async () => {
             if (!selectedCompanyId) return [];
-            const res = await api.get<WorkLog[]>(`/work-logs/?company_id=${selectedCompanyId}`);
+            const res = await api.get<WorkLog[]>(`/work-logs?company_id=${selectedCompanyId}`);
             return res.data;
         },
         queryKey: ["companyWorkLogs", selectedCompanyId],

@@ -95,7 +95,7 @@ export function ReportGenerationDialog({ companies = [], children, open, onOpenC
 
         try {
             // Fetch records from API
-            const response = await api.get<WorkLog[]>('/work-logs/', {
+            const response = await api.get<WorkLog[]>('/work-logs', {
                 params: {
                     start_date: format(start, 'yyyy-MM-dd'),
                     end_date: format(end, 'yyyy-MM-dd'),

@@ -95,7 +95,7 @@ export function AdminCreateWorkLogDialog({ users, allUserSettings, onLogUpdate, 
         // Calculations are done in the backend now
 
         try {
-            await api.post("/work-logs/", logData);
+            await api.post("/work-logs", logData);
             toast({ title: "Éxito", description: "Registro de trabajo añadido correctamente." });
             setOpen(false);
             resetForm();

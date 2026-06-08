@@ -29,7 +29,7 @@ export default function PrintReportPage() {
         queryKey: ['reportLogs', startStr, endStr],
         queryFn: async () => {
             if (!startStr || !endStr) return [];
-            const response = await api.get<WorkLog[]>('/work-logs/', {
+            const response = await api.get<WorkLog[]>('/work-logs', {
                 params: {
                     start_date: startStr,
                     end_date: endStr,
