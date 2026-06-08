@@ -333,11 +333,18 @@ def create_work_log(db: Session, work_log: schemas.WorkLogCreate):
     if work_log.net_amount is None and float(type_rate.get("base_rate", 0)) <= 0:
         raise ValueError(f"No se ha encontrado un precio (rate) configurado para el tipo '{work_type}' para este usuario.")
 
-    # Use Dynamic Engine
-    calc = calculate_dynamic_work_log(work_log.model_dump(), type_def, type_rate, company.tax_config if company else None)
-
     # Prepare DB Obj
     work_log_data = work_log.model_dump()
+
+    # Adjust end_date if it crosses midnight
+    if type_def.get("unit") == "hours" and work_log_data.get('start_time') and work_log_data.get('end_time'):
+        if work_log_data['end_time'] < work_log_data['start_time']:
+            from datetime import timedelta
+            work_log_data['end_date'] = work_log_data['start_date'] + timedelta(days=1)
+
+    # Use Dynamic Engine (passing the adjusted work_log_data)
+    calc = calculate_dynamic_work_log(work_log_data, type_def, type_rate, company.tax_config if company else None)
+
     # Remove calculated and renamed fields
     for k in ['net_amount', 'gross_amount', 'rate_applied', 'duration', 'amount']:
         work_log_data.pop(k, None)
@@ -396,6 +403,12 @@ def create_work_log_bulk(db: Session, work_log_bulk: schemas.WorkLogBulkCreate):
         individual_log_data['user_id'] = user_id
         individual_log_data['group_id'] = group_id
         
+        # Adjust end_date if it crosses midnight
+        if type_def.get("unit") == "hours" and individual_log_data.get('start_time') and individual_log_data.get('end_time'):
+            if individual_log_data['end_time'] < individual_log_data['start_time']:
+                from datetime import timedelta
+                individual_log_data['end_date'] = individual_log_data['start_date'] + timedelta(days=1)
+
         # Use Dynamic Engine
         calc = calculate_dynamic_work_log(individual_log_data, type_def, type_rate, tax_config)
         
@@ -498,6 +511,13 @@ def _update_single_work_log(db: Session, db_work_log: models.WorkLog, work_log: 
     # Force recalculation if net_amount not in NEW data
     if 'net_amount' not in new_data:
         merged_data.pop('net_amount', None)
+
+    # Adjust end_date if it crosses midnight
+    if type_def.get("unit") == "hours" and merged_data.get('start_time') and merged_data.get('end_time'):
+        if merged_data['end_time'] < merged_data['start_time']:
+            from datetime import timedelta
+            merged_data['end_date'] = merged_data['start_date'] + timedelta(days=1)
+            new_data['end_date'] = merged_data['end_date']
 
     calc = calculate_dynamic_work_log(merged_data, type_def, type_rate, company.tax_config if company else None)
     

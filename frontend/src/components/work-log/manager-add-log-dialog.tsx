@@ -128,11 +128,29 @@ export function ManagerAddWorkLogDialog({
             return;
         }
 
-        const sharedData = {
+        const sharedData: any = {
             ...formData,
             companyId: companyId,
             type: logType,
         };
+
+        // SaaS Logic: Ensure startDate/endDate are present for all types
+        // In 'particular' (single day) mode, they should match 'date'
+        if (logType === 'particular' || !sharedData.startDate) {
+            sharedData.startDate = sharedData.date;
+            sharedData.endDate = sharedData.date;
+        }
+
+        // Remove redundant frontend-only fields
+        delete sharedData.date;
+
+        // Clean calculated fields during edits to force backend recalculation
+        if (initialData?.id) {
+            delete sharedData.amount;
+            delete sharedData.rateApplied;
+            delete sharedData.grossAmount;
+            delete sharedData.isGrossCalculation;
+        }
 
         try {
             if (initialData?.id) {

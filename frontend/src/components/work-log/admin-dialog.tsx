@@ -76,11 +76,21 @@ export function AdminCreateWorkLogDialog({ users, allUserSettings, onLogUpdate, 
             return;
         }
 
-        let logData: WorkLogCreate = {
-            ...formData as WorkLogCreate,
+        let logData: any = {
+            ...formData,
             userId: selectedUserId,
             type: logType,
         };
+
+        // SaaS Logic: Ensure startDate/endDate are present for all types
+        // In 'particular' (single day) mode, they should match 'date'
+        if (logType === 'particular' || !logData.startDate) {
+            logData.startDate = logData.date;
+            logData.endDate = logData.date;
+        }
+
+        // Remove redundant frontend-only fields
+        delete logData.date;
 
         // Calculations are done in the backend now
 
