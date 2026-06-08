@@ -7,7 +7,7 @@ import { getMyCompanies } from "@/lib/api/companies";
 import { CompanyResponse } from "@/lib/types";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, FileText, Calendar, Settings, Users, Building2, Bell, Banknote } from "lucide-react";
+import { LayoutDashboard, FileText, Calendar, Settings, Users, Building2, Bell, Banknote, CalendarDays } from "lucide-react";
 import { Sidebar, SidebarProvider } from "@/components/ui/sidebar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -152,9 +152,10 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
 
             const managerItems = [
                 { href: `/manager/dashboard${querySuffix}`, label: "Dashboard", icon: LayoutDashboard },
+                { href: `/manager/calendar${querySuffix}`, label: "Calendario", icon: Calendar },
                 { href: `/manager/daily-reports${querySuffix}`, label: "Parte Diario", icon: FileText },
                 { href: `/manager/users${querySuffix}`, label: "Usuarios", icon: Users },
-                { href: `/manager/shifts${querySuffix}`, label: "Turnos", icon: Calendar },
+                { href: `/manager/shifts${querySuffix}`, label: "Turnos", icon: CalendarDays },
             ];
             if (isBillingEnabled) {
                 managerItems.push({ href: `/manager/billing${querySuffix}`, label: "Facturación", icon: Banknote });
