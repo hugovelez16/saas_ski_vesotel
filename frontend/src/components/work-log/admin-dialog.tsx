@@ -103,7 +103,28 @@ export function AdminCreateWorkLogDialog({ users, allUserSettings, onLogUpdate, 
 
         } catch (error: any) {
             console.error("Error creating work log:", error);
-            toast({ title: "Error", description: "No se pudo crear el registro.", variant: "destructive" });
+            let msg = "No se pudo crear el registro.";
+            
+            if (error.response?.data?.detail) {
+                const detail = error.response.data.detail;
+                if (typeof detail === 'string') {
+                    msg = detail;
+                } else if (Array.isArray(detail)) {
+                    msg = detail.map((d: any) => d.msg || JSON.stringify(d)).join(", ");
+                } else if (typeof detail === 'object') {
+                    msg = detail.message || JSON.stringify(detail);
+                }
+            } else if (error.message) {
+                msg = error.message;
+            }
+
+            // Check if it's a rate/pricing related validation error and make it friendly
+            const lowercaseMsg = msg.toLowerCase();
+            if (lowercaseMsg.includes("precio") || lowercaseMsg.includes("rate") || lowercaseMsg.includes("tarifa")) {
+                msg = "No se puede guardar: El usuario no tiene tarifas configuradas para este tipo de turno. Por favor, configura sus tarifas primero.";
+            }
+
+            toast({ title: "Error al guardar", description: msg, variant: "destructive" });
         } finally {
             setIsLoading(false);
         }

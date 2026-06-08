@@ -193,15 +193,27 @@ export function UserCreateWorkLogDialog({
 
         } catch (error: any) {
             console.error("Error saving work log:", error);
-            let msg = error.response?.data?.detail || "Could not save the log.";
+            let msg = "Could not save the log.";
             
-            // Handle FastAPI/Pydantic validation errors (array of objects)
-            if (Array.isArray(msg)) {
-                msg = msg.map(e => `${e.loc.join('.')}: ${e.msg}`).join(', ');
-            } else if (typeof msg === 'object') {
-                msg = JSON.stringify(msg);
+            if (error.response?.data?.detail) {
+                const detail = error.response.data.detail;
+                if (typeof detail === 'string') {
+                    msg = detail;
+                } else if (Array.isArray(detail)) {
+                    msg = detail.map((d: any) => d.msg || JSON.stringify(d)).join(", ");
+                } else if (typeof detail === 'object') {
+                    msg = detail.message || JSON.stringify(detail);
+                }
+            } else if (error.message) {
+                msg = error.message;
             }
-            
+
+            // Check if it's a rate/pricing related validation error and make it friendly
+            const lowercaseMsg = msg.toLowerCase();
+            if (lowercaseMsg.includes("precio") || lowercaseMsg.includes("rate") || lowercaseMsg.includes("tarifa")) {
+                msg = "No se puede guardar: El usuario no tiene tarifas configuradas para este tipo de turno. Por favor, configura sus tarifas primero.";
+            }
+
             toast({ title: "Error", description: String(msg), variant: "destructive" });
         } finally {
             setIsLoading(false);

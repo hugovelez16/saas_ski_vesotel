@@ -113,9 +113,9 @@ export function ManagerAddWorkLogDialog({
     }, [open, companyId, initialData, isControlled]);
 
     // Mock company object for WorkLogForm (passing worklogDefinitions)
-    const companies = useMemo(() => [{ 
-        id: companyId, 
-        name: companyName, 
+    const companies = useMemo(() => [{
+        id: companyId,
+        name: companyName,
         settings: {},
         worklogDefinitions: worklogDefinitions || {}
     }], [companyId, companyName, worklogDefinitions]);
@@ -196,8 +196,28 @@ export function ManagerAddWorkLogDialog({
 
         } catch (error: any) {
             console.error("Error saving work log:", error);
-            const msg = error.response?.data?.detail || "No se pudo guardar el registro.";
-            toast({ title: "Error", description: msg, variant: "destructive" });
+            let msg = "No se pudo guardar el registro.";
+            
+            if (error.response?.data?.detail) {
+                const detail = error.response.data.detail;
+                if (typeof detail === 'string') {
+                    msg = detail;
+                } else if (Array.isArray(detail)) {
+                    msg = detail.map((d: any) => d.msg || JSON.stringify(d)).join(", ");
+                } else if (typeof detail === 'object') {
+                    msg = detail.message || JSON.stringify(detail);
+                }
+            } else if (error.message) {
+                msg = error.message;
+            }
+
+            // Check if it's a rate/pricing related validation error and make it friendly
+            const lowercaseMsg = msg.toLowerCase();
+            if (lowercaseMsg.includes("precio") || lowercaseMsg.includes("rate") || lowercaseMsg.includes("tarifa")) {
+                msg = "No se puede guardar: El usuario no tiene tarifas configuradas para este tipo de turno. Por favor, configura sus tarifas primero.";
+            }
+
+            toast({ title: "Error al guardar", description: msg, variant: "destructive" });
         } finally {
             setIsLoading(false);
         }
@@ -221,9 +241,9 @@ export function ManagerAddWorkLogDialog({
     const filteredUsers = useMemo(() => {
         if (!searchQuery.trim()) return users;
         const query = searchQuery.toLowerCase();
-        return users.filter(u => 
-            (u.firstName || '').toLowerCase().includes(query) || 
-            (u.lastName || '').toLowerCase().includes(query) || 
+        return users.filter(u =>
+            (u.firstName || '').toLowerCase().includes(query) ||
+            (u.lastName || '').toLowerCase().includes(query) ||
             (u.email || '').toLowerCase().includes(query)
         );
     }, [users, searchQuery]);
@@ -238,7 +258,7 @@ export function ManagerAddWorkLogDialog({
                     </Button>
                 )}
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto bg-white dark:bg-slate-950">
+            <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto bg-white dark:bg-slate-950" onOpenAutoFocus={(e) => e.preventDefault()}>
                 <DialogHeader>
                     <DialogTitle>Añadir Registro - {companyName}</DialogTitle>
                     <DialogDescription>
@@ -254,8 +274,8 @@ export function ManagerAddWorkLogDialog({
                                 selectedUsersNames.map((name, idx) => (
                                     <Badge key={idx} variant="secondary" className="flex items-center gap-1 py-1">
                                         {name}
-                                        <X 
-                                            className="h-3 w-3 cursor-pointer hover:text-destructive" 
+                                        <X
+                                            className="h-3 w-3 cursor-pointer hover:text-destructive"
                                             onClick={() => toggleUser(selectedUserIds[idx])}
                                         />
                                     </Badge>
@@ -276,12 +296,12 @@ export function ManagerAddWorkLogDialog({
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 {filteredUsers.map((u: any) => (
                                     <div key={u.id} className="flex items-center space-x-2 p-1 hover:bg-slate-100 dark:hover:bg-slate-900 rounded transition-colors">
-                                        <Checkbox 
-                                            id={`user-${u.id}`} 
+                                        <Checkbox
+                                            id={`user-${u.id}`}
                                             checked={selectedUserIds.includes(u.id)}
                                             onCheckedChange={() => toggleUser(u.id)}
                                         />
-                                        <Label 
+                                        <Label
                                             htmlFor={`user-${u.id}`}
                                             className="text-xs cursor-pointer flex-1 truncate"
                                             title={`${u.firstName} ${u.lastName}`}
