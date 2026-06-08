@@ -76,9 +76,10 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
 
             const managerItems = [
                 { href: `/manager/dashboard${querySuffix}`, label: "Dashboard", icon: LayoutDashboard },
+                { href: `/manager/calendar${querySuffix}`, label: "Calendario", icon: Calendar },
                 { href: `/manager/daily-reports${querySuffix}`, label: "Parte Diario", icon: FileText },
                 { href: `/manager/users${querySuffix}`, label: "Usuarios", icon: Users },
-                { href: `/manager/shifts${querySuffix}`, label: "Turnos", icon: Calendar },
+                { href: `/manager/shifts${querySuffix}`, label: "Turnos", icon: CalendarDays },
             ];
             if (isBillingEnabled) {
                 managerItems.push({ href: `/manager/billing${querySuffix}`, label: "Facturación", icon: Banknote });

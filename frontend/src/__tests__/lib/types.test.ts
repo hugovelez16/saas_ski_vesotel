@@ -111,16 +111,16 @@ describe('Type Definitions — Compile-time Safety', () => {
         expect(create.userId).toBe('u-1');
     });
 
-    it('Token should use snake_case', () => {
+    it('Token should use camelCase', () => {
         const token: Token = {
-            access_token: 'abc123',
-            token_type: 'bearer',
-            requires_2fa: false,
-            device_token: 'dev-123',
+            accessToken: 'abc123',
+            tokenType: 'bearer',
+            requires2Fa: false,
+            deviceToken: 'dev-123',
         };
 
-        expect(token.access_token).toBe('abc123');
-        expect(token.token_type).toBe('bearer');
+        expect(token.accessToken).toBe('abc123');
+        expect(token.tokenType).toBe('bearer');
     });
 
     it('CompanyMember should reference userId', () => {

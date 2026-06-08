@@ -128,10 +128,10 @@ describe('Users API Client', () => {
 
     describe('Admin Functions', () => {
         it('impersonateUser should POST /admin/impersonate/:id', async () => {
-            (mockedApi.post as any).mockResolvedValue({ data: { access_token: 'tok' } });
+            (mockedApi.post as any).mockResolvedValue({ data: { accessToken: 'tok' } });
             const result = await impersonateUser('u-1');
             expect(mockedApi.post).toHaveBeenCalledWith('/admin/impersonate/u-1');
-            expect(result.access_token).toBe('tok');
+            expect(result.accessToken).toBe('tok');
         });
 
 
