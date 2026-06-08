@@ -223,12 +223,6 @@ export function ManagerAddWorkLogDialog({
         }
     }
 
-    const selectedUsersNames = useMemo(() => {
-        return selectedUserIds.map(id => {
-            const u = users.find(u => u.id === id);
-            return u ? `${u.firstName} ${u.lastName}` : null;
-        }).filter(Boolean);
-    }, [selectedUserIds, users]);
 
     const toggleUser = (userId: string) => {
         setSelectedUserIds(prev =>
@@ -270,16 +264,20 @@ export function ManagerAddWorkLogDialog({
                     <div className="grid gap-2">
                         <Label>Usuarios seleccionados ({selectedUserIds.length})</Label>
                         <div className="flex flex-wrap gap-2 border p-2 rounded-md min-h-[40px] bg-slate-50 dark:bg-slate-900">
-                            {selectedUsersNames.length > 0 ? (
-                                selectedUsersNames.map((name, idx) => (
-                                    <Badge key={idx} variant="secondary" className="flex items-center gap-1 py-1">
-                                        {name}
-                                        <X
-                                            className="h-3 w-3 cursor-pointer hover:text-destructive"
-                                            onClick={() => toggleUser(selectedUserIds[idx])}
-                                        />
-                                    </Badge>
-                                ))
+                            {selectedUserIds.length > 0 ? (
+                                selectedUserIds.map((userId) => {
+                                    const u = users.find(u => u.id === userId);
+                                    const name = u ? `${u.firstName} ${u.lastName}` : `Usuario ${userId}`;
+                                    return (
+                                        <Badge key={userId} variant="secondary" className="flex items-center gap-1 py-1">
+                                            {name}
+                                            <X
+                                                className="h-3 w-3 cursor-pointer hover:text-destructive"
+                                                onClick={() => toggleUser(userId)}
+                                            />
+                                        </Badge>
+                                    );
+                                })
                             ) : (
                                 <span className="text-muted-foreground text-sm italic">Ningún usuario seleccionado</span>
                             )}
