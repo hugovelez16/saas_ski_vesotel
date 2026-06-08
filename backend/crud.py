@@ -85,6 +85,12 @@ def get_company_member(db: Session, user_id: str, company_id: str):
         models.CompanyMember.company_id == company_id
     ).first()
 
+def get_worklog_unit(type_def: dict) -> str:
+    unit = type_def.get("unit")
+    if not unit:
+        unit = "days" if type_def.get("is_range") else "hours"
+    return unit
+
 def calculate_dynamic_work_log(log_data: dict, company_def: dict, user_rate: dict, company_tax_config: dict = None):
     """
     SaaS Evolution: Dynamic calculation engine.
@@ -102,7 +108,7 @@ def calculate_dynamic_work_log(log_data: dict, company_def: dict, user_rate: dic
         }
 
     # 2. Extract configuration
-    unit = company_def.get("unit", "hours") # hours, days, fixed
+    unit = get_worklog_unit(company_def)
     base_rate = float(user_rate.get("base_rate", 0))
     is_gross = user_rate.get("is_gross", True)
     
@@ -337,7 +343,7 @@ def create_work_log(db: Session, work_log: schemas.WorkLogCreate):
     work_log_data = work_log.model_dump()
 
     # Adjust end_date if it crosses midnight
-    if type_def.get("unit") == "hours" and work_log_data.get('start_time') and work_log_data.get('end_time'):
+    if get_worklog_unit(type_def) == "hours" and work_log_data.get('start_time') and work_log_data.get('end_time'):
         if work_log_data['end_time'] < work_log_data['start_time']:
             from datetime import timedelta
             work_log_data['end_date'] = work_log_data['start_date'] + timedelta(days=1)
@@ -404,7 +410,7 @@ def create_work_log_bulk(db: Session, work_log_bulk: schemas.WorkLogBulkCreate):
         individual_log_data['group_id'] = group_id
         
         # Adjust end_date if it crosses midnight
-        if type_def.get("unit") == "hours" and individual_log_data.get('start_time') and individual_log_data.get('end_time'):
+        if get_worklog_unit(type_def) == "hours" and individual_log_data.get('start_time') and individual_log_data.get('end_time'):
             if individual_log_data['end_time'] < individual_log_data['start_time']:
                 from datetime import timedelta
                 individual_log_data['end_date'] = individual_log_data['start_date'] + timedelta(days=1)
@@ -513,7 +519,7 @@ def _update_single_work_log(db: Session, db_work_log: models.WorkLog, work_log: 
         merged_data.pop('net_amount', None)
 
     # Adjust end_date if it crosses midnight
-    if type_def.get("unit") == "hours" and merged_data.get('start_time') and merged_data.get('end_time'):
+    if get_worklog_unit(type_def) == "hours" and merged_data.get('start_time') and merged_data.get('end_time'):
         if merged_data['end_time'] < merged_data['start_time']:
             from datetime import timedelta
             merged_data['end_date'] = merged_data['start_date'] + timedelta(days=1)
