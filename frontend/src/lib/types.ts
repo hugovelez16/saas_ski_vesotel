@@ -107,6 +107,13 @@ export interface CompanyWithMembers extends Company {
     members: CompanyMember[];
 }
 
+export interface WorkLogExtraData {
+    datos?: Record<string, string | number>;
+    opciones?: Record<string, boolean>;
+    client?: string;
+    group_id?: string;
+}
+
 /**
  * WorkLog Interface (Refactored for SaaS Dynamic Engine)
  */
@@ -128,7 +135,7 @@ export interface WorkLog {
     // Historical Snapshot
     calculationSnapshot?: Record<string, any>;
 
-    extraData: Record<string, any>;
+    extraData: WorkLogExtraData;
     description?: string | null;
     pickupPoint?: string | null;
     groupId?: string | null;
@@ -168,7 +175,7 @@ export interface WorkLogCreate {
     endTime?: string | null;
     description?: string | null;
     pickupPoint?: string | null;
-    extraData?: Record<string, any>;
+    extraData?: WorkLogExtraData;
     amount?: number; // Manual override
     date?: string | null;
     hasCoordination?: boolean;
