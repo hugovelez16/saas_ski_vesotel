@@ -87,7 +87,7 @@ export default function LoginPage() {
               style={{ width: "auto", height: "auto" }} // Nextjs aspect ratio fix
             />
           </div>
-          <CardTitle className="text-2xl font-bold">Ski Vesotel</CardTitle>
+          <CardTitle className="text-2xl font-bold">Clases Vesotel</CardTitle>
           {/* <CardDescription>Management Backoffice</CardDescription> Removed as requested */}
         </CardHeader>
         <CardContent>
