@@ -145,13 +145,17 @@ export function WorkLogsTable({
             header: "Fecha",
             cell: ({ row }) => {
                 const log = row.original;
+                const isMultiDay = log.type === 'tutorial' && log.startDate && log.endDate && log.startDate !== log.endDate;
                 return (
                     <div className="flex flex-col">
-                        <span className="font-medium">
-                            {log.startDate ? format(parseISO(log.startDate), "dd/MM/yyyy") : (log.date ? format(parseISO(log.date), "dd/MM/yyyy") : "-")}
+                        <span className="font-medium whitespace-nowrap">
+                            {isMultiDay
+                                ? `${format(parseISO(log.startDate), "dd/MM/yyyy")} - ${format(parseISO(log.endDate), "dd/MM/yyyy")}`
+                                : (log.startDate ? format(parseISO(log.startDate), "dd/MM/yyyy") : (log.date ? format(parseISO(log.date), "dd/MM/yyyy") : "-"))
+                            }
                         </span>
-                        {log.startTime && log.endTime && (
-                            <span className="text-xs text-muted-foreground">{log.startTime} - {log.endTime}</span>
+                        {log.type === 'particular' && log.startTime && log.endTime && (
+                            <span className="text-xs text-muted-foreground whitespace-nowrap">{log.startTime} - {log.endTime}</span>
                         )}
                     </div>
                 );

@@ -102,7 +102,7 @@ export function WorkLogDetailsDialog({ log, open, onOpenChange, companies: initi
                             ) : isFixed ? (
                                 <p className="font-medium">Precio Fijo / Jornada</p>
                             ) : (
-                                <p className="font-medium">{log.startTime} - {log.endTime} ({log.durationHours?.toFixed(2)}h)</p>
+                                <p className="font-medium">{log.startTime} - {log.endTime} ({Number(log.duration ?? log.durationHours ?? 0).toFixed(2)}h)</p>
                             )}
                         </div>
                     </div>
@@ -120,13 +120,16 @@ export function WorkLogDetailsDialog({ log, open, onOpenChange, companies: initi
                                         <p>{log.extraData?.datos?.[field] || '-'}</p>
                                     </div>
                                 ))}
-                                {log.description && (
-                                    <div className="sm:col-span-2">
-                                        <h5 className="text-xs font-medium text-muted-foreground">Descripción</h5>
-                                        <p className="italic">{log.description}</p>
-                                    </div>
-                                )}
                             </div>
+                        </div>
+                    )}
+
+                    {log.description && (
+                        <div className="space-y-1">
+                            <h5 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Descripción</h5>
+                            <p className="text-sm bg-slate-50 dark:bg-slate-900/30 p-3 rounded border italic">
+                                "{log.description}"
+                            </p>
                         </div>
                     )}
 
