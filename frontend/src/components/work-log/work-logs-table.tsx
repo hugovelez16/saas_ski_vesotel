@@ -169,6 +169,19 @@ export function WorkLogsTable({
             )
         });
 
+        // Description Column
+        columns.push({
+            accessorKey: "description",
+            header: "Descripción",
+            cell: ({ row }) => (
+                <div className="max-w-[200px] truncate" title={row.original.description || ""}>
+                    <span className="text-sm text-slate-600 dark:text-slate-400">
+                        {row.original.description || "-"}
+                    </span>
+                </div>
+            )
+        });
+
         // Company Column
         if (selectedCompanyId === "all" && !fixedCompanyId) {
             columns.push({
