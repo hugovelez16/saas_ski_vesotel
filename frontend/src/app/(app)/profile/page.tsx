@@ -122,7 +122,7 @@ export default function ProfilePage() {
     resolver: zodResolver(rateFormSchema),
     defaultValues: {
       rates: {},
-      isGross: true,
+      isGross: false,
       deductionSs: undefined,
       deductionIrpf: 0,
       deductionExtra: 0,
@@ -155,7 +155,7 @@ export default function ProfilePage() {
       const member = rates[0] as CompanyMember;
       const ratesConfig = member.ratesConfig || {};
       
-      let isGross = true;
+      let isGross = false;
       let deductionSs: number | undefined = undefined;
       let deductionIrpf: number | undefined = undefined;
       let deductionExtra: number | undefined = undefined;
@@ -170,7 +170,7 @@ export default function ProfilePage() {
          if (shiftData && typeof shiftData === 'object') {
              shiftRates[key] = shiftData.base_rate || 0;
              if (!foundTaxes) {
-                 isGross = shiftData.is_gross !== undefined ? shiftData.is_gross : true;
+                 isGross = shiftData.is_gross !== undefined ? shiftData.is_gross : false;
                  if (shiftData.tax_overrides) {
                      deductionSs = (shiftData.tax_overrides.ss !== undefined && shiftData.tax_overrides.ss !== null) ? shiftData.tax_overrides.ss * 100 : undefined;
                      deductionIrpf = (shiftData.tax_overrides.irpf !== undefined && shiftData.tax_overrides.irpf !== null) ? shiftData.tax_overrides.irpf * 100 : undefined;
@@ -193,7 +193,7 @@ export default function ProfilePage() {
     } else {
       rateForm.reset({
         rates: {},
-        isGross: true,
+        isGross: false,
         deductionSs: undefined,
         deductionIrpf: undefined,
         deductionExtra: undefined,

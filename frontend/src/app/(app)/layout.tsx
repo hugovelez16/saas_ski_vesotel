@@ -72,7 +72,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             
             // Modules check for Reports
             const reportsConfig = settings.modules?.reports ?? settings.features?.reports;
-            const hasReports = !!reportsConfig && (typeof reportsConfig === 'boolean' ? reportsConfig : (reportsConfig.enabled !== false));
+            const hasReports = reportsConfig === undefined ? true : (typeof reportsConfig === 'boolean' ? reportsConfig : (reportsConfig.enabled !== false));
 
             const managerItems = [
                 { href: `/manager/dashboard${querySuffix}`, label: "Dashboard", icon: LayoutDashboard },
@@ -96,7 +96,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             // Check if reports are enabled for ANY of the user's companies (since reports page handles company selection)
             const hasAnyReports = user?.role === 'admin' || myCompanies.some((c: any) => {
                 const config = c.settings?.modules?.reports ?? c.settings?.features?.reports;
-                return !!config && (typeof config === 'boolean' ? config : (config.enabled !== false));
+                return config === undefined ? true : (typeof config === 'boolean' ? config : (config.enabled !== false));
             });
 
             const items = [...workerNavItems];
@@ -120,7 +120,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             // Reports check
             const hasAnyReports = myCompanies.some((c: any) => {
                 const config = c.settings?.modules?.reports ?? c.settings?.features?.reports;
-                return !!config && (typeof config === 'boolean' ? config : (config.enabled !== false));
+                return config === undefined ? true : (typeof config === 'boolean' ? config : (config.enabled !== false));
             });
 
             const items = [...workerNavItems];
@@ -149,7 +149,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             
             // Reports check
             const reportsConfig = settings.modules?.reports ?? settings.features?.reports;
-            const hasReports = !!reportsConfig && (typeof reportsConfig === 'boolean' ? reportsConfig : (reportsConfig.enabled !== false));
+            const hasReports = reportsConfig === undefined ? true : (typeof reportsConfig === 'boolean' ? reportsConfig : (reportsConfig.enabled !== false));
 
             const managerItems = [
                 { href: `/manager/dashboard${querySuffix}`, label: "Dashboard", icon: LayoutDashboard },

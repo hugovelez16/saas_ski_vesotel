@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -17,6 +17,13 @@ export function BusinessLogicBuilder({ initialValue, onSave }: BusinessLogicBuil
         price_type: initialValue?.business_logic?.price_type || initialValue?.billing?.price_type || "net",
         cost_markup: initialValue?.business_logic?.cost_markup || 0,
     });
+
+    useEffect(() => {
+        setLogic({
+            price_type: initialValue?.business_logic?.price_type || initialValue?.billing?.price_type || "net",
+            cost_markup: initialValue?.business_logic?.cost_markup || 0,
+        });
+    }, [JSON.stringify(initialValue?.business_logic || initialValue?.billing || {})]);
 
     const handleSave = () => {
         onSave({

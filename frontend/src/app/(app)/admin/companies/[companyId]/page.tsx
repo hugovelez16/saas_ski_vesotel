@@ -253,7 +253,7 @@ export default function CompanyDetailsPage() {
 
                 {/* UI SETTINGS TAB */}
                 <TabsContent value="settings" className="pt-4">
-                    <CompanyConfigurationTab company={company} />
+                    <CompanyConfigurationTab key={company.id} company={company} />
                 </TabsContent>
             </Tabs>
         </div>

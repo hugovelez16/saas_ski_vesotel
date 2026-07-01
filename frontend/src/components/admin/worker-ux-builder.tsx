@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -17,6 +17,13 @@ export function WorkerUXBuilder({ initialValue, onSave }: WorkerUXBuilderProps) 
         input_mode: initialValue?.worker_experience?.input_mode || initialValue?.input_mode || "manual_single",
         allow_manual_amount: initialValue?.worker_experience?.allow_manual_amount || false,
     });
+
+    useEffect(() => {
+        setUx({
+            input_mode: initialValue?.worker_experience?.input_mode || initialValue?.input_mode || "manual_single",
+            allow_manual_amount: initialValue?.worker_experience?.allow_manual_amount || false,
+        });
+    }, [JSON.stringify(initialValue?.worker_experience || {})]);
 
     const handleSave = () => {
         onSave({

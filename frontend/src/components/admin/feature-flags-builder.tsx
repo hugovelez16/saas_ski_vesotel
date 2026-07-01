@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,10 @@ interface FeatureFlagsBuilderProps {
 
 export function FeatureFlagsBuilder({ initialValue, onSave }: FeatureFlagsBuilderProps) {
     const [modules, setModules] = useState<Record<string, any>>(initialValue?.modules || initialValue?.features || {});
+
+    useEffect(() => {
+        setModules(initialValue?.modules || initialValue?.features || {});
+    }, [JSON.stringify(initialValue?.modules || initialValue?.features || {})]);
 
     const handleToggle = (id: string) => {
         setModules((prev: any) => {

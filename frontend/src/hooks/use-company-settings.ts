@@ -7,6 +7,7 @@ const DEFAULT_SETTINGS: CompanySettings = {
         worker_daily_report: true,
         client_database: false,
         advanced_reports: false,
+        reports: true,
     },
     business_logic: {
         price_type: 'gross',
