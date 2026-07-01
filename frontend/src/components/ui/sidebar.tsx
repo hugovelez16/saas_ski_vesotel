@@ -229,7 +229,7 @@ export function Sidebar({ navGroups }: { navGroups: NavGroup[] }) {
                                         <span className="text-sm font-medium">Cambiar Contexto</span>
                                         <span className="text-[10px] opacity-70 uppercase tracking-tighter truncate w-full text-left">
                                             {activeCompany ? `${activeCompany.name} • ` : ''}
-                                            {!user?.activeRole ? 'Administrador' : (user.activeRole === 'manager' ? 'Manager' : 'Trabajador')}
+                                            {user?.isPlatformAdmin && !user?.activeRole ? 'Administrador' : (user?.activeRole === 'manager' ? 'Manager' : 'Trabajador')}
                                         </span>
                                     </div>
                                 </button>
@@ -335,7 +335,7 @@ export function Sidebar({ navGroups }: { navGroups: NavGroup[] }) {
                                 <span className="text-sm font-medium">Cambiar Contexto</span>
                                 <span className="text-[10px] opacity-50 uppercase font-bold tracking-tighter truncate w-full text-left">
                                     {activeCompany ? `${activeCompany.name} • ` : ''}
-                                    {!user?.activeRole ? 'Administrador' : (user.activeRole === 'manager' ? 'Manager' : 'Trabajador')}
+                                    {user?.isPlatformAdmin && !user?.activeRole ? 'Administrador' : (user?.activeRole === 'manager' ? 'Manager' : 'Trabajador')}
                                 </span>
                             </div>
                         )}
