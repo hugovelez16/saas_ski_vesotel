@@ -29,6 +29,7 @@ patch-commit
 .env.development.local
 .env.test.local
 .env.production.local
+.env.swarm
 *.sql
 *.tar.gz
 
