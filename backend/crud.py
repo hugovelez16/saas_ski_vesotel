@@ -110,7 +110,7 @@ def calculate_dynamic_work_log(log_data: dict, company_def: dict, user_rate: dic
     # 2. Extract configuration
     unit = get_worklog_unit(company_def)
     base_rate = float(user_rate.get("base_rate", 0))
-    is_gross = user_rate.get("is_gross", True)
+    is_gross = user_rate.get("is_gross", False)
     
     # Tax configuration (Priority: rate override > company default > 0)
     user_overrides = user_rate.get("tax_overrides", {})

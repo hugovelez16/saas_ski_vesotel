@@ -119,7 +119,7 @@ class UserCompanyRateBase(CamelModel):
     daily_rate: Optional[float] = 0.0
     coordination_rate: Optional[float] = 0.0
     night_rate: Optional[float] = 0.0
-    is_gross: Optional[bool] = True
+    is_gross: Optional[bool] = False
     deduction_ss: Optional[float] = None
     deduction_irpf: Optional[float] = 0.0
     deduction_extra: Optional[float] = 0.0

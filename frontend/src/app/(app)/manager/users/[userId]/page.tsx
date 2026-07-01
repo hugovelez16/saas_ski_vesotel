@@ -77,7 +77,7 @@ function CompanyMemberConfigCard({ user, company, onUpdate }: { user: any, compa
         defaultValues: {
             role: company.role || "worker",
             isActive: company.isActiveMember ?? true,
-            isGross: true,
+            isGross: false,
             rates: {},
             taxOverrides: {
                 ss: null,
@@ -90,7 +90,7 @@ function CompanyMemberConfigCard({ user, company, onUpdate }: { user: any, compa
     useEffect(() => {
         const shiftKeys = Object.keys(worklogDefinitions);
         const initialRates: Record<string, number> = {};
-        let isGross = true;
+        let isGross = false;
         let taxOverrides: { ss: number | null, irpf: number, extra: number } = { ss: null, irpf: 0, extra: 0 };
 
         let foundTaxes = false;
@@ -99,7 +99,7 @@ function CompanyMemberConfigCard({ user, company, onUpdate }: { user: any, compa
             if (shiftData && typeof shiftData === 'object') {
                 initialRates[key] = shiftData.base_rate || 0;
                 if (!foundTaxes) {
-                    isGross = shiftData.is_gross !== undefined ? shiftData.is_gross : true;
+                    isGross = shiftData.is_gross !== undefined ? shiftData.is_gross : false;
                     if (shiftData.tax_overrides) {
                         taxOverrides = {
                             ss: (shiftData.tax_overrides.ss !== undefined && shiftData.tax_overrides.ss !== null) ? parseFloat((shiftData.tax_overrides.ss * 100).toFixed(4)) : null,
