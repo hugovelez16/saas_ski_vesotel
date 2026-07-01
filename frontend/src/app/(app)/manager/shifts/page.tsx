@@ -17,13 +17,11 @@ import {
     TableRow,
 } from "@/components/ui/data-table";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { format, parseISO } from "date-fns";
 import { Loader2, ArrowUp, ArrowDown, ArrowUpDown, User as UserIcon, Calendar, Sparkles, Moon } from "lucide-react";
-import { WorkLog } from "@/lib/types";
 import { FilterBar, FilterConfig } from "@/components/ui/filter-bar";
-import { DataTable } from "@/components/ui/data-table";
-import { ColumnDef } from "@tanstack/react-table";
+import { WorkLogsTable } from "@/components/work-log/work-logs-table";
 import { Badge } from "@/components/ui/badge";
+import { WorkLog } from "@/lib/types";
 
 export default function ManagerShiftsPage() {
     const { user } = useAuth();
@@ -82,79 +80,7 @@ export default function ManagerShiftsPage() {
         });
     }, [workLogs, selectedCompany, filters]);
 
-    const columns: ColumnDef<any>[] = [
-        {
-            accessorKey: "userName",
-            header: "Usuario",
-            cell: ({ row }) => (
-                <div className="flex flex-col">
-                    <span className="font-medium text-slate-900 dark:text-slate-100">{row.original.userName}</span>
-                    <span className="text-xs text-muted-foreground truncate max-w-[150px]">{row.original.userEmail}</span>
-                </div>
-            )
-        },
-        {
-            accessorKey: "date",
-            header: "Fecha",
-            cell: ({ row }) => {
-                const log = row.original;
-                return (
-                    <div className="flex items-center gap-2">
-                        <span className="font-medium whitespace-nowrap">
-                            {log.type === 'tutorial' && log.startDate && log.endDate
-                                ? `${format(parseISO(log.startDate), "dd/MM/yyyy")} - ${format(parseISO(log.endDate), "dd/MM/yyyy")}`
-                                : (log.date ? format(parseISO(log.date), "dd/MM/yyyy") : "-")}
-                        </span>
-                        {log.type === 'particular' && log.startTime && log.endTime && (
-                            <span className="text-xs text-muted-foreground whitespace-nowrap">
-                                {log.startTime} - {log.endTime}
-                            </span>
-                        )}
-                    </div>
-                );
-            }
-        },
-        {
-            accessorKey: "type",
-            header: "Tipo",
-            cell: ({ row }) => (
-                <Badge
-                    variant={row.original.type === 'tutorial' ? 'secondary' : 'default'}
-                    className={row.original.type === 'tutorial' ? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-100' : 'bg-blue-100 text-blue-700 hover:bg-blue-100'}
-                >
-                    {row.original.type}
-                </Badge>
-            )
-        },
 
-        {
-            id: "flags",
-            header: "Extras",
-            cell: ({ row }) => (
-                <div className="flex gap-1">
-                    {row.original.hasCoordination && (
-                        <div className="p-1 bg-yellow-50 text-yellow-700 rounded border border-yellow-100" title="Coordinación">
-                            <Sparkles className="h-3 w-3" />
-                        </div>
-                    )}
-                    {row.original.hasNight && (
-                        <div className="p-1 bg-indigo-50 text-indigo-700 rounded border border-indigo-100" title="Nocturnidad">
-                            <Moon className="h-3 w-3" />
-                        </div>
-                    )}
-                </div>
-            )
-        },
-        {
-            accessorKey: "amount",
-            header: () => <div className="text-right">Importe</div>,
-            cell: ({ row }) => (
-                <div className="text-right font-medium">
-                    {row.original.amount ? `€${Number(row.original.amount).toFixed(2)}` : '-'}
-                </div>
-            )
-        }
-    ];
 
     if (loadingCompanies) {
         return <div className="p-8 flex items-center justify-center text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Cargando empresas...</div>;
@@ -176,12 +102,14 @@ export default function ManagerShiftsPage() {
             <div className="space-y-4">
                 <FilterBar config={filterConfig} onFilterChange={setFilters} />
 
-                <DataTable
-                    columns={columns}
+                <WorkLogsTable
                     data={logsWithMeta}
+                    companies={companies}
+                    fixedCompanyId={selectedCompanyId || undefined}
+                    showUserColumn={true}
+                    readOnly={true}
+                    onUpdate={() => {}}
                     isLoading={loadingLogs}
-                    searchKey="userName"
-                    searchPlaceholder="Buscar por usuario..."
                 />
 
                 <div className="text-xs text-muted-foreground text-right">

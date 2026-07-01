@@ -420,7 +420,7 @@ export default function ListPage() {
                       </div>
                     </TableCell>
                     {dynamicFields.map(field => (
-                      <TableCell key={field} className="py-2 hidden lg:table-cell truncate max-w-[100px]" title={log.extraData?.datos?.[field] || '-'}>
+                      <TableCell key={field} className="py-2 hidden lg:table-cell truncate max-w-[100px]" title={String(log.extraData?.datos?.[field] ?? '-')}>
                         {log.extraData?.datos?.[field] || '-'}
                       </TableCell>
                     ))}

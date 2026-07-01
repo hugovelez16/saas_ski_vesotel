@@ -13,8 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar, Building2, Wallet, Database, ArrowLeft, Loader2, Sparkles, Moon, Trash2, Pencil, Shield } from "lucide-react";
 import { format } from "date-fns";
 import { useState, useMemo, useEffect } from "react";
-import { DataTable } from "@/components/ui/data-table";
-import { ColumnDef } from "@tanstack/react-table";
+import { WorkLogsTable } from "@/components/work-log/work-logs-table";
 import { useToast } from "@/hooks/use-toast";
 import { JsonEditor } from "@/components/admin/json-editor";
 import { UserEditDialog } from "@/components/admin/user-edit-dialog";
@@ -380,8 +379,7 @@ export default function UserDetailPage() {
     const { toast } = useToast();
     const userId = params.userId as string;
 
-    const [selectedLog, setSelectedLog] = useState<any | null>(null);
-    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
 
     const { data: user, isLoading: loadingUser } = useQuery({
         queryFn: () => getUser(userId),
@@ -395,7 +393,7 @@ export default function UserDetailPage() {
     });
 
     const { data: workLogs = [], isLoading: loadingLogs } = useQuery({
-        queryFn: () => getWorkLogs({ userId: userId }),
+        queryFn: () => getWorkLogs({ userId: userId, limit: 1000 }),
         queryKey: ["work-logs", userId],
         enabled: !!userId,
     });
@@ -410,133 +408,7 @@ export default function UserDetailPage() {
         onError: () => toast({ title: "Error al actualizar", variant: "destructive" })
     });
 
-    const handleDeleteLog = async (logId: string) => {
-        if (!confirm("¿Eliminar este parte de trabajo?")) return;
-        try {
-            await deleteWorkLog(logId);
-            toast({ title: "Parte eliminado" });
-            queryClient.invalidateQueries({ queryKey: ["work-logs", userId] });
-        } catch (error) {
-            toast({ title: "Error al eliminar", variant: "destructive" });
-        }
-    };
 
-    // 1. Obtener todas las definiciones de campos de todas las empresas para tener etiquetas legibles
-    const fieldDefinitions = useMemo(() => {
-        const defs: Record<string, { label: string, icon?: any }> = {};
-        companies.forEach(c => {
-            if (c.worklogDefinitions) {
-                Object.entries(c.worklogDefinitions).forEach(([key, val]: [string, any]) => {
-                    defs[key] = { label: val.label || key };
-                });
-            }
-        });
-        // Añadir mapeos manuales para iconos conocidos
-        if (defs["has_coordination"]) defs["has_coordination"].icon = Sparkles;
-        if (defs["has_night"]) defs["has_night"].icon = Moon;
-        return defs;
-    }, [companies]);
-
-    // 2. Identificar qué campos de extraData existen realmente en los datos actuales
-    const dynamicExtraKeys = useMemo(() => {
-        const keys = new Set<string>();
-        workLogs.forEach(log => {
-            if (log.extraData) {
-                Object.keys(log.extraData).forEach(k => {
-                    // Solo añadimos si tiene un valor que valga la pena mostrar
-                    if (log.extraData[k] !== null && log.extraData[k] !== undefined && log.extraData[k] !== false) {
-                        keys.add(k);
-                    }
-                });
-            }
-        });
-        return Array.from(keys);
-    }, [workLogs]);
-
-    // 3. Construir las columnas dinámicamente
-    const logColumns = useMemo<ColumnDef<any>[]>(() => {
-        // Columnas Base (Siempre presentes)
-        const columns: ColumnDef<any>[] = [
-            {
-                accessorKey: "date",
-                header: "Fecha",
-                cell: ({ row }) => (
-                    <div className="flex flex-col">
-                        <span className="font-medium">
-                            {row.original.startDate ? format(new Date(row.original.startDate), "dd/MM/yyyy") : row.original.date ? format(new Date(row.original.date), "dd/MM/yyyy") : "-"}
-                        </span>
-                        {row.original.startTime && (
-                            <span className="text-xs text-muted-foreground">{row.original.startTime} - {row.original.endTime}</span>
-                        )}
-                    </div>
-                )
-            },
-            {
-                accessorKey: "type",
-                header: "Tipo",
-                cell: ({ row }) => <Badge variant="outline" className="capitalize">{row.original.type}</Badge>
-            },
-            {
-                accessorKey: "companyId",
-                header: "Empresa",
-                cell: ({ row }) => {
-                    const company = companies.find(c => c.id === row.original.companyId);
-                    return <span>{company?.name ?? "N/A"}</span>;
-                }
-            },
-        ];
-
-        // Columnas Dinámicas (basadas en extraData detectado)
-        dynamicExtraKeys.forEach(key => {
-            const def = fieldDefinitions[key];
-            const label = def?.label || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-            const Icon = def?.icon;
-
-            columns.push({
-                id: `extra-${key}`,
-                header: label,
-                cell: ({ row }) => {
-                    const val = row.original.extraData?.[key];
-                    if (val === null || val === undefined || val === false) return <span />;
-
-                    if (typeof val === 'boolean') {
-                        return Icon ? <Icon className="h-4 w-4 text-indigo-500" /> : <Badge variant="secondary" className="text-[10px]">Sí</Badge>;
-                    }
-                    
-                    if (typeof val === 'object') {
-                        return <span className="text-sm">{JSON.stringify(val)}</span>;
-                    }
-                    
-                    return <span className="text-sm">{String(val)}</span>;
-                }
-            });
-        });
-
-        // Columnas Finales (Importe y Acciones)
-        columns.push(
-            {
-                accessorKey: "amount",
-                header: "Importe",
-                cell: ({ row }) => <span className="font-bold text-slate-900">€{Number(row.original.amount || 0).toFixed(2)}</span>
-            },
-            {
-                id: "actions",
-                header: "",
-                cell: ({ row }) => (
-                    <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600" onClick={(e) => {
-                            e.stopPropagation(); // Evitar que el click en borrar abra el diálogo de edición
-                            handleDeleteLog(row.original.id);
-                        }}>
-                            <Trash2 className="h-4 w-4" />
-                        </Button>
-                    </div>
-                )
-            }
-        );
-
-        return columns;
-    }, [companies, dynamicExtraKeys, fieldDefinitions]);
 
     if (loadingUser) return <div className="p-8 text-center"><Loader2 className="animate-spin" /> Cargando...</div>;
     if (!user) return <div className="p-8 text-center text-red-600">Usuario no encontrado</div>;
@@ -577,15 +449,12 @@ export default function UserDetailPage() {
                             <CardDescription>Visualización completa de la actividad registrada.</CardDescription>
                         </CardHeader>
                         <CardContent className="px-0">
-                            <DataTable
-                                columns={logColumns}
+                            <WorkLogsTable
                                 data={workLogs}
-                                searchKey="type"
-                                searchPlaceholder="Buscar por tipo..."
-                                onRowClick={(log) => {
-                                    setSelectedLog(log);
-                                    setIsEditDialogOpen(true);
-                                }}
+                                companies={companies}
+                                user={user}
+                                onUpdate={() => queryClient.invalidateQueries({ queryKey: ["work-logs", userId] })}
+                                isLoading={loadingLogs}
                             />
                         </CardContent>
                     </Card>
@@ -605,18 +474,6 @@ export default function UserDetailPage() {
                 </TabsContent>
 
             </Tabs>
-
-            {/* Dialog de Edición de Log */}
-            {selectedLog && (
-                <UserCreateWorkLogDialog
-                    user={user}
-                    companies={companies}
-                    logToEdit={selectedLog}
-                    open={isEditDialogOpen}
-                    onOpenChange={setIsEditDialogOpen}
-                    onLogUpdate={() => queryClient.invalidateQueries({ queryKey: ["work-logs", userId] })}
-                />
-            )}
         </div>
     );
 }

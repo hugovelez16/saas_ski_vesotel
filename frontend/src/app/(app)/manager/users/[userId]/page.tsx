@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar, Building2, Clock, User as UserIcon, CheckCircle, XCircle, ArrowUp, ArrowDown, ArrowUpDown, ChevronLeft, ChevronRight, Sparkles, Moon, Pencil, Trash2, Wallet, Database, Loader2, Shield } from "lucide-react";
 import { format, subMonths, addMonths, parseISO, differenceInCalendarDays } from "date-fns";
-import { DataTable } from "@/components/ui/data-table";
+import { WorkLogsTable } from "@/components/work-log/work-logs-table";
 import { FilterBar, FilterConfig } from "@/components/ui/filter-bar";
 import { useState, useMemo, use, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -375,7 +375,6 @@ export default function ManagerUserDetailsPage({ params }: { params: Promise<{ u
     const queryClient = useQueryClient();
     const [filters, setFilters] = useState<Record<string, any>>({});
     const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
-    const [editLogState, setEditLogState] = useState<{ open: boolean, data?: Partial<any> }>({ open: false });
     const [selectedLog, setSelectedLog] = useState<WorkLog | null>(null);
 
     // Dashboard State
@@ -386,17 +385,6 @@ export default function ManagerUserDetailsPage({ params }: { params: Promise<{ u
 
     const handleLogUpdate = () => {
         queryClient.invalidateQueries({ queryKey: ["workLogs", userId] });
-    };
-
-    const handleDeleteLog = async (logId: string) => {
-        if (!confirm("Are you sure you want to delete this work log?")) return;
-        try {
-            await deleteWorkLog(logId);
-            toast({ title: "Success", description: "Work log deleted." });
-            queryClient.invalidateQueries({ queryKey: ["workLogs", userId] });
-        } catch (error) {
-            toast({ title: "Error", description: "Failed to delete work log.", variant: "destructive" });
-        }
     };
 
     // Fetch user-specific data
@@ -753,88 +741,12 @@ export default function ManagerUserDetailsPage({ params }: { params: Promise<{ u
                             <CardDescription>Registros de actividad realizados por este usuario.</CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <DataTable
-                                columns={[
-                                    {
-                                        accessorKey: "date",
-                                        header: "Fecha",
-                                        cell: ({ row }) => (
-                                            <div className="flex flex-col">
-                                                <span className="font-medium">
-                                                    {row.original.type === 'tutorial'
-                                                        ? `${format(new Date(row.original.startDate), "dd/MM/yy")} - ${format(new Date(row.original.endDate), "dd/MM/yy")}`
-                                                        : format(new Date(row.original.startDate || row.original.date || ""), "dd/MM/yyyy")}
-                                                </span>
-                                                {row.original.type === 'particular' && (
-                                                    <span className="text-xs text-muted-foreground">
-                                                        {row.original.startTime} - {row.original.endTime}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        )
-                                    },
-                                    {
-                                        accessorKey: "type",
-                                        header: "Tipo",
-                                        cell: ({ row }) => (
-                                            <Badge variant={row.original.type === 'tutorial' ? 'outline' : 'default'} className="capitalize">
-                                                {row.original.type}
-                                            </Badge>
-                                        )
-                                    },
-                                    {
-                                        id: "flags",
-                                        header: "Extras",
-                                        cell: ({ row }) => (
-                                            <div className="flex gap-1">
-                                                {row.original.hasCoordination && (
-                                                    <span title="Coordinación">
-                                                        <Sparkles className="h-4 w-4 text-blue-500" />
-                                                    </span>
-                                                )}
-                                                {row.original.hasNight && (
-                                                    <span title="Nocturnidad">
-                                                        <Moon className="h-4 w-4 text-indigo-500" />
-                                                    </span>
-                                                )}
-                                            </div>
-                                        )
-                                    },
-                                    {
-                                        id: "duration",
-                                        header: "Duración",
-                                        cell: ({ row }) => row.original.type === 'particular'
-                                            ? `${row.original.durationHours}h`
-                                            : `${differenceInCalendarDays(new Date(row.original.endDate), new Date(row.original.startDate)) + 1}d`
-                                    },
-                                    {
-                                        accessorKey: "amount",
-                                        header: () => <div className="text-right">Importe</div>,
-                                        cell: ({ row }) => (
-                                            <div className="text-right font-bold text-emerald-600 dark:text-emerald-400">
-                                                €{Number(row.original.amount || 0).toFixed(2)}
-                                            </div>
-                                        )
-                                    },
-                                    {
-                                        id: "actions",
-                                        cell: ({ row }) => (
-                                            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                                                <Button variant="ghost" size="sm" onClick={() => setEditLogState({ open: true, data: row.original })}>
-                                                    <Pencil className="h-4 w-4" />
-                                                </Button>
-                                                <Button variant="ghost" size="sm" onClick={() => handleDeleteLog(row.original.id)}>
-                                                    <Trash2 className="h-4 w-4 text-red-500" />
-                                                </Button>
-                                            </div>
-                                        )
-                                    }
-                                ]}
+                            <WorkLogsTable
                                 data={filteredLogs}
-                                onRowClick={setSelectedLog}
+                                companies={visibleCompanies}
+                                user={user}
+                                onUpdate={() => queryClient.invalidateQueries({ queryKey: ["workLogs", userId] })}
                                 isLoading={isLoadingLogs}
-                                searchKey="type"
-                                searchPlaceholder="Buscar por tipo..."
                             />
                         </CardContent>
                     </Card>
@@ -868,26 +780,8 @@ export default function ManagerUserDetailsPage({ params }: { params: Promise<{ u
                 log={selectedLog}
                 open={!!selectedLog}
                 onOpenChange={(open) => !open && setSelectedLog(null)}
-                userSettings={effectiveUserSettings}
-                onDelete={(log) => {
-                    handleDeleteLog(log.id);
-                    setSelectedLog(null);
-                }}
-            />
-
-            <UserCreateWorkLogDialog
-                open={editLogState.open}
-                onOpenChange={(open) => setEditLogState(prev => ({ ...prev, open }))}
-                logToEdit={editLogState.data as WorkLog}
-                user={user}
                 companies={visibleCompanies}
-                onLogUpdate={() => {
-                    queryClient.invalidateQueries({ queryKey: ["workLogs", userId] });
-                    setEditLogState({ open: false });
-                }}
-            >
-                <span className="hidden" />
-            </UserCreateWorkLogDialog>
+            />
         </div>
     );
 }
