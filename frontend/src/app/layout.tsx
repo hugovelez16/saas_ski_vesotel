@@ -6,7 +6,7 @@ import { Providers } from "@/components/providers";
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: "Ski Vesotel",
+  title: "Clases Vesotel",
   description: "Gestión de Jornadas de Esquí",
   icons: {
     icon: "/logo.webp",
