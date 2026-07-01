@@ -130,24 +130,6 @@ export function OverviewV3({ workLogs, companies, activeCompanyId, onAddRecord, 
         };
     }, [workLogs, companies, selectedDate]);
 
-    // SaaS Dynamic Columns Logic
-    const activeCompany = useMemo(() => {
-        if (!activeCompanyId) return null;
-        return companies.find(c => c.id === activeCompanyId);
-    }, [companies, activeCompanyId]);
-
-    const dynamicFields = useMemo(() => {
-        if (!activeCompany?.worklogDefinitions) return [];
-        const fields = new Set<string>();
-        Object.values(activeCompany.worklogDefinitions).forEach((def: any) => {
-            if (def.fields && Array.isArray(def.fields)) {
-                def.fields.forEach((f: string) => fields.add(f));
-            }
-        });
-        // We exclude 'description' as it's usually standard or handled separately
-        return Array.from(fields).filter((f: string) => f !== 'description');
-    }, [activeCompany]);
-
     // 3. Chart Data (Aligned with Analytics: Last 6 Months)
     const chartData = useMemo(() => {
         const end = selectedDate;
@@ -178,6 +160,34 @@ export function OverviewV3({ workLogs, companies, activeCompanyId, onAddRecord, 
         const dateB = parseISO(b.startDate || b.createdAt);
         return dateB.getTime() - dateA.getTime();
     }).slice(0, 5);
+
+    // SaaS Dynamic Columns Logic: Scan actual logs to find populated JSONB keys
+    const dynamicFields = useMemo(() => {
+        const keys = new Set<string>();
+        recentLogs.forEach(log => {
+            if (log.extraData) {
+                const datos = log.extraData.datos;
+                if (datos) {
+                    Object.keys(datos).forEach(k => {
+                        const val = datos[k];
+                        if (val !== null && val !== undefined && (val as any) !== false && val !== "") {
+                            keys.add(k);
+                        }
+                    });
+                }
+                const opciones = log.extraData.opciones;
+                if (opciones) {
+                    Object.keys(opciones).forEach(k => {
+                        const val = opciones[k];
+                        if (val !== null && val !== undefined && val !== false) {
+                            keys.add(k);
+                        }
+                    });
+                }
+            }
+        });
+        return Array.from(keys);
+    }, [recentLogs]);
 
     return (
         <div className="space-y-6">
@@ -364,14 +374,17 @@ export function OverviewV3({ workLogs, companies, activeCompanyId, onAddRecord, 
                             <Table className="min-w-full">
                                 <TableHeader>
                                     <TableRow className="bg-slate-900 hover:bg-slate-900 border-none">
-                                        <TableHead className="text-slate-50 rounded-tl-md whitespace-nowrap">Date</TableHead>
-                                        <TableHead className="text-slate-50 min-w-[100px]">Type</TableHead>
-                                        <TableHead className="text-slate-50 min-w-[120px]">Client</TableHead>
-                                        {dynamicFields.map(field => (
-                                            <TableHead key={field} className="text-slate-50 capitalize hidden lg:table-cell">{field}</TableHead>
-                                        ))}
-                                        <TableHead className="text-slate-50 hidden md:table-cell">Flags</TableHead>
-                                        <TableHead className="text-slate-50 rounded-tr-md">Amount</TableHead>
+                                        <TableHead className="text-slate-50 rounded-tl-md whitespace-nowrap">Fecha</TableHead>
+                                        <TableHead className="text-slate-50 min-w-[100px]">Tipo</TableHead>
+                                        <TableHead className="text-slate-50 min-w-[120px]">Descripción</TableHead>
+                                        {dynamicFields.map(field => {
+                                            const label = field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                                            return (
+                                                <TableHead key={field} className="text-slate-50 hidden lg:table-cell">{label}</TableHead>
+                                            );
+                                        })}
+                                        <TableHead className="text-slate-50 hidden md:table-cell">Extras</TableHead>
+                                        <TableHead className="text-slate-50 rounded-tr-md">Importe</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -391,7 +404,7 @@ export function OverviewV3({ workLogs, companies, activeCompanyId, onAddRecord, 
                                                 <TableCell className="py-2">
                                                     <div className="flex items-center gap-2">
                                                         <span className="font-medium whitespace-nowrap">
-                                                            {log.type === 'tutorial' && log.startDate && log.endDate
+                                                            {log.type === 'tutorial' && log.startDate && log.endDate && log.startDate !== log.endDate
                                                                 ? `${format(parseISO(log.startDate), "dd/MM/yyyy")} - ${format(parseISO(log.endDate), "dd/MM/yyyy")}`
                                                                 : log.startDate
                                                                     ? format(parseISO(log.startDate), "dd/MM/yyyy")
@@ -404,18 +417,34 @@ export function OverviewV3({ workLogs, companies, activeCompanyId, onAddRecord, 
                                                         )}
                                                     </div>
                                                 </TableCell>
-                                                <TableCell className="capitalize py-2">{log.type}</TableCell>
                                                 <TableCell className="py-2">
-                                                    <div className="flex items-center gap-2 max-w-[150px] md:max-w-[200px] truncate" title={log.extraData?.client || log.description || ''}>
-                                                        {(log.extraData?.client || log.description) && <UserIcon className="h-3 w-3 text-muted-foreground shrink-0" />}
-                                                        <span className="truncate block">{log.extraData?.client || log.description || '-'}</span>
+                                                    {(() => {
+                                                        const logCompany = companies.find(c => c.id === log.companyId);
+                                                        const label = logCompany?.worklogDefinitions?.[log.type]?.label || log.type;
+                                                        return <span className="capitalize">{label}</span>;
+                                                    })()}
+                                                </TableCell>
+                                                <TableCell className="py-2">
+                                                    <div className="max-w-[150px] md:max-w-[200px] truncate" title={log.description || ''}>
+                                                        <span className="truncate block">{log.description || '-'}</span>
                                                     </div>
                                                 </TableCell>
-                                                {dynamicFields.map(field => (
-                                                    <TableCell key={field} className="py-2 hidden lg:table-cell truncate max-w-[100px]" title={log.extraData?.datos?.[field] || '-'}>
-                                                        {log.extraData?.datos?.[field] || '-'}
-                                                    </TableCell>
-                                                ))}
+                                                {dynamicFields.map(field => {
+                                                    const val = log.extraData?.datos?.[field] !== undefined
+                                                        ? log.extraData?.datos?.[field]
+                                                        : log.extraData?.opciones?.[field];
+                                                    
+                                                    if (val === null || val === undefined || val === false || val === "") {
+                                                        return <TableCell key={field} className="py-2 hidden lg:table-cell">-</TableCell>;
+                                                    }
+                                                    
+                                                    const displayVal = typeof val === 'boolean' ? 'Sí' : String(val);
+                                                    return (
+                                                        <TableCell key={field} className="py-2 hidden lg:table-cell truncate max-w-[100px]" title={displayVal}>
+                                                            {displayVal}
+                                                        </TableCell>
+                                                    );
+                                                })}
                                                 <TableCell className="py-2 hidden md:table-cell">
                                                     <div className="flex gap-1">
                                                         {log.hasCoordination && (

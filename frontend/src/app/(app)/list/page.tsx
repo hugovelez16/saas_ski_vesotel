@@ -195,15 +195,31 @@ export default function ListPage() {
   }, [companies, activeCompanyId]);
 
   const dynamicFields = useMemo(() => {
-    if (!activeCompany?.worklogDefinitions) return [];
-    const fields = new Set<string>();
-    Object.values(activeCompany.worklogDefinitions).forEach((def: any) => {
-      if (def.fields && Array.isArray(def.fields)) {
-        def.fields.forEach((f: string) => fields.add(f));
+    const keys = new Set<string>();
+    sortedWorkLogs.forEach(log => {
+      if (log.extraData) {
+        const datos = log.extraData.datos;
+        if (datos) {
+          Object.keys(datos).forEach(k => {
+            const val = datos[k];
+            if (val !== null && val !== undefined && (val as any) !== false && val !== "") {
+              keys.add(k);
+            }
+          });
+        }
+        const opciones = log.extraData.opciones;
+        if (opciones) {
+          Object.keys(opciones).forEach(k => {
+            const val = opciones[k];
+            if (val !== null && val !== undefined && val !== false) {
+              keys.add(k);
+            }
+          });
+        }
       }
     });
-    return Array.from(fields).filter((f: string) => f !== 'description');
-  }, [activeCompany]);
+    return Array.from(keys);
+  }, [sortedWorkLogs]);
 
   const handleSort = (key: string) => {
     setSortConfig(current => {
@@ -306,7 +322,7 @@ export default function ListPage() {
             <TableRow className="bg-slate-900 hover:bg-slate-900 border-none">
               <TableHead className="cursor-pointer hover:bg-slate-800 transition-colors text-slate-50 rounded-tl-md" onClick={() => handleSort('date')}>
                 <div className="flex items-center gap-1">
-                  Date
+                  Fecha
                   {sortConfig?.key === 'date' ? (
                     sortConfig.direction === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
                   ) : <ArrowUpDown className="h-4 w-4 text-slate-50/50" />}
@@ -314,7 +330,7 @@ export default function ListPage() {
               </TableHead>
               <TableHead className="cursor-pointer hover:bg-slate-800 transition-colors text-slate-50" onClick={() => handleSort('type')}>
                 <div className="flex items-center gap-1">
-                  Type
+                  Tipo
                   {sortConfig?.key === 'type' ? (
                     sortConfig.direction === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
                   ) : <ArrowUpDown className="h-4 w-4 text-slate-50/50" />}
@@ -322,19 +338,22 @@ export default function ListPage() {
               </TableHead>
               <TableHead className="cursor-pointer hover:bg-slate-800 transition-colors text-slate-50" onClick={() => handleSort('description')}>
                 <div className="flex items-center gap-1">
-                  Description
+                  Descripción
                   {sortConfig?.key === 'description' ? (
                     sortConfig.direction === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
                   ) : <ArrowUpDown className="h-4 w-4 text-slate-50/50" />}
                 </div>
               </TableHead>
-              {dynamicFields.map(field => (
-                <TableHead key={field} className="text-slate-50 capitalize hidden lg:table-cell">{field}</TableHead>
-              ))}
-              <TableHead className="text-slate-50">Flags</TableHead>
+              {dynamicFields.map(field => {
+                const label = field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                return (
+                  <TableHead key={field} className="text-slate-50 hidden lg:table-cell">{label}</TableHead>
+                );
+              })}
+              <TableHead className="text-slate-50">Extras</TableHead>
               <TableHead className="cursor-pointer hover:bg-slate-800 transition-colors text-slate-50" onClick={() => handleSort('duration')}>
                 <div className="flex items-center gap-1">
-                  Duration/Days
+                  Duración/Días
                   {sortConfig?.key === 'duration' ? (
                     sortConfig.direction === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
                   ) : <ArrowUpDown className="h-4 w-4 text-slate-50/50" />}
@@ -342,7 +361,7 @@ export default function ListPage() {
               </TableHead>
               <TableHead className="cursor-pointer hover:bg-slate-800 transition-colors text-slate-50" onClick={() => handleSort('amount')}>
                 <div className="flex items-center gap-1">
-                  Amount
+                  Importe
                   {sortConfig?.key === 'amount' ? (
                     sortConfig.direction === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
                   ) : <ArrowUpDown className="h-4 w-4 text-slate-50/50" />}
@@ -385,10 +404,12 @@ export default function ListPage() {
                   const prevType = index > 0 ? array[index - 1].type : null;
 
                   if (currentType !== prevType) {
+                    const logCompany = companies.find(c => c.id === log.companyId);
+                    const label = logCompany?.worklogDefinitions?.[currentType]?.label || currentType;
                     acc.push(
                       <TableRow key={`header-${currentType}`} className="bg-muted/50 hover:bg-muted/50">
                         <TableCell colSpan={totalCols} className="font-semibold text-sm py-2 capitalize">
-                          {currentType}
+                          {label}
                         </TableCell>
                       </TableRow>
                     );
@@ -413,17 +434,34 @@ export default function ListPage() {
                         )}
                       </div>
                     </TableCell>
-                    <TableCell className="capitalize py-2">{log.type}</TableCell>
+                    <TableCell className="py-2">
+                      {(() => {
+                        const logCompany = companies.find(c => c.id === log.companyId);
+                        const label = logCompany?.worklogDefinitions?.[log.type]?.label || log.type;
+                        return <span className="capitalize">{label}</span>;
+                      })()}
+                    </TableCell>
                     <TableCell className="py-2">
                       <div className="flex items-center gap-2 max-w-[200px] truncate" title={log.description || ''}>
                         <span className="truncate">{log.description || '-'}</span>
                       </div>
                     </TableCell>
-                    {dynamicFields.map(field => (
-                      <TableCell key={field} className="py-2 hidden lg:table-cell truncate max-w-[100px]" title={String(log.extraData?.datos?.[field] ?? '-')}>
-                        {log.extraData?.datos?.[field] || '-'}
-                      </TableCell>
-                    ))}
+                    {dynamicFields.map(field => {
+                      const val = log.extraData?.datos?.[field] !== undefined
+                        ? log.extraData?.datos?.[field]
+                        : log.extraData?.opciones?.[field];
+
+                      if (val === null || val === undefined || val === false || val === "") {
+                        return <TableCell key={field} className="py-2 hidden lg:table-cell">-</TableCell>;
+                      }
+
+                      const displayVal = typeof val === 'boolean' ? 'Sí' : String(val);
+                      return (
+                        <TableCell key={field} className="py-2 hidden lg:table-cell truncate max-w-[100px]" title={displayVal}>
+                          {displayVal}
+                        </TableCell>
+                      );
+                    })}
                     <TableCell className="py-2">
                       <div className="flex gap-1">
                         {log.hasCoordination && (
@@ -439,11 +477,50 @@ export default function ListPage() {
                       </div>
                     </TableCell>
                     <TableCell className="py-2">
-                      {log.type === 'particular'
-                        ? `${log.durationHours} h`
-                        : log.startDate && log.endDate
-                          ? `${(new Date(log.endDate).getTime() - new Date(log.startDate).getTime()) / (1000 * 3600 * 24) + 1} days`
-                          : '-'}
+                      {(() => {
+                        const calcDuration = log.calculationSnapshot?.calculations?.duration;
+                        const calcUnit = log.calculationSnapshot?.calculations?.unit;
+                        
+                        if (calcDuration !== undefined && calcUnit !== undefined) {
+                          if (calcUnit === 'hours') return `${Number(calcDuration).toFixed(2)} h`;
+                          if (calcUnit === 'days') return `${calcDuration} ${calcDuration === 1 ? 'día' : 'días'}`;
+                          if (calcUnit === 'fixed') return 'Fijo';
+                          return `${calcDuration} ${calcUnit}`;
+                        }
+
+                        const logCompany = companies.find(c => c.id === log.companyId);
+                        const definition = logCompany?.worklogDefinitions?.[log.type];
+                        
+                        if (definition) {
+                          const unit = definition.unit || (definition.is_range ? 'days' : 'hours');
+                          if (unit === 'hours') {
+                            const hours = log.duration ?? log.durationHours ?? 0;
+                            return `${Number(hours).toFixed(2)} h`;
+                          }
+                          if (unit === 'days') {
+                            const start = new Date(log.startDate);
+                            const end = new Date(log.endDate);
+                            const msPerDay = 1000 * 60 * 60 * 24;
+                            const days = log.startDate && log.endDate ? Math.round((end.getTime() - start.getTime()) / msPerDay) + 1 : 0;
+                            return `${days} ${days === 1 ? 'día' : 'días'}`;
+                          }
+                          if (unit === 'fixed') {
+                            return 'Fijo';
+                          }
+                        }
+
+                        if (log.type === 'particular') {
+                          return `${log.durationHours || 0} h`;
+                        }
+                        if (log.startDate && log.endDate) {
+                          const start = new Date(log.startDate);
+                          const end = new Date(log.endDate);
+                          const msPerDay = 1000 * 60 * 60 * 24;
+                          const days = Math.round((end.getTime() - start.getTime()) / msPerDay) + 1;
+                          return `${days} ${days === 1 ? 'día' : 'días'}`;
+                        }
+                        return '-';
+                      })()}
                     </TableCell>
                     <TableCell className="py-2">
                       {(() => {

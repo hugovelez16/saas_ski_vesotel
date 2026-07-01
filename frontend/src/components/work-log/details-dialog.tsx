@@ -128,7 +128,7 @@ export function WorkLogDetailsDialog({ log, open, onOpenChange, companies: initi
                         <div className="space-y-1">
                             <h5 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Descripción</h5>
                             <p className="text-sm bg-slate-50 dark:bg-slate-900/30 p-3 rounded border italic">
-                                "{log.description}"
+                                {log.description}
                             </p>
                         </div>
                     )}
