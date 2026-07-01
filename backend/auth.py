@@ -134,6 +134,8 @@ def generate_user_tokens(db: Session, user: models.User, company_id: Optional[st
             
             if active_cid:
                 membership = query.filter(models.CompanyMember.company_id == active_cid).first()
+                if not membership:
+                    membership = query.first()
             else:
                 membership = query.first()
                 

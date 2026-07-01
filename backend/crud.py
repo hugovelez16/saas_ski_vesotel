@@ -626,6 +626,19 @@ def update_company_member_status(db: Session, company_id: str, user_id: str, is_
     
     if member:
         member.is_active = is_active
+        
+        # If deactivating, check if this company was the user's default company
+        if not is_active:
+            user = db.query(models.User).filter(models.User.id == member.user_id).first()
+            if user and user.default_company_id and str(user.default_company_id) == str(member.company_id):
+                # Find the next active membership
+                next_active = db.query(models.CompanyMember).filter(
+                    models.CompanyMember.user_id == member.user_id,
+                    models.CompanyMember.company_id != member.company_id,
+                    models.CompanyMember.is_active == True
+                ).first()
+                user.default_company_id = next_active.company_id if next_active else None
+                
         db.commit()
         db.refresh(member)
         _invalidate_company_rates(company_id)
@@ -662,6 +675,18 @@ def update_company_member(db: Session, company_id: Any, user_id: Any, member_upd
                 setattr(member, key, value)
             if key in ["settings", "rates_config"]:
                  flag_modified(member, key)
+                 
+        # Protection: if is_active is set to False, reassign user's default_company_id
+        if update_data.get("is_active") == False:
+            user = db.query(models.User).filter(models.User.id == member.user_id).first()
+            if user and user.default_company_id and str(user.default_company_id) == str(member.company_id):
+                next_active = db.query(models.CompanyMember).filter(
+                    models.CompanyMember.user_id == member.user_id,
+                    models.CompanyMember.company_id != member.company_id,
+                    models.CompanyMember.is_active == True
+                ).first()
+                user.default_company_id = next_active.company_id if next_active else None
+
         db.commit()
         db.refresh(member)
         _invalidate_company_rates(company_id)
