@@ -30,7 +30,7 @@ export function mapMemberToLegacyRate(member: CompanyMember): UserCompanyRate {
         dailyRate: member.ratesConfig?.particular?.base_rate || 0,
         nightRate: member.ratesConfig?.night?.base_rate || 0,
         coordinationRate: member.ratesConfig?.coordination?.base_rate || 0,
-        isGross: entry?.is_gross !== undefined ? entry.is_gross : true,
+        isGross: entry?.is_gross !== undefined ? entry.is_gross : false,
         deductionSs: entry?.tax_overrides?.ss ?? undefined,
         deductionIrpf: entry?.tax_overrides?.irpf ?? 0,
         deductionExtra: entry?.tax_overrides?.extra ?? 0,

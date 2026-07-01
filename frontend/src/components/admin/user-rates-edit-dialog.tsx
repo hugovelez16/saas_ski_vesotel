@@ -95,7 +95,7 @@ export function UserRatesEditDialog({ userId, company, member, userName, open: e
 
             form.reset({
                 rates: initialRates,
-                isGross: entryWithIsGross?.is_gross !== undefined ? entryWithIsGross.is_gross : true,
+                isGross: entryWithIsGross?.is_gross !== undefined ? entryWithIsGross.is_gross : false,
                 deductionSs: (entryWithSs?.tax_overrides?.ss !== undefined && entryWithSs?.tax_overrides?.ss !== null) 
                     ? parseFloat((entryWithSs.tax_overrides.ss * 100).toFixed(4)) 
                     : null,
