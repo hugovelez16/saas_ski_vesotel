@@ -16,6 +16,7 @@ import { Suspense } from "react";
 function AppLayoutContent({ children }: { children: React.ReactNode }) {
     const { user, loading, logout } = useAuth();
     const router = useRouter();
+    const pathname = usePathname();
     const searchParams = useSearchParams();
     const currentCompanyId = searchParams.get("companyId");
 
@@ -175,10 +176,14 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     // (Account Group removed: Informes moved to Manager/Worker sections)
 
     useEffect(() => {
-        if (!loading && !user) {
-            router.push('/login');
+        if (!loading) {
+            if (!user) {
+                router.push('/login');
+            } else if (user.mustChangePassword && pathname !== '/force-change-password') {
+                router.push('/force-change-password');
+            }
         }
-    }, [user, loading, router]);
+    }, [user, loading, router, pathname]);
 
     if (loading) {
         return <div className="flex h-screen items-center justify-center">Loading...</div>;
@@ -232,6 +237,16 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         const pathname = window.location.pathname;
         router.push(`${pathname}?${params.toString()}`);
     };
+
+    if (user?.mustChangePassword && pathname === '/force-change-password') {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
+                <main className="w-full max-w-md">
+                    {children}
+                </main>
+            </div>
+        );
+    }
 
     return (
         <SidebarProvider>

@@ -72,5 +72,16 @@ export const impersonateUser = async (userId: string): Promise<Token> => {
     return response.data;
 };
 
+// Password Recovery
+export const forgotPassword = async (email: string): Promise<{ message: string }> => {
+    const response = await api.post("/auth/forgot-password", { email });
+    return response.data;
+};
+
+export const resetPassword = async (data: any): Promise<{ message: string }> => {
+    const response = await api.post("/auth/reset-password", data);
+    return response.data;
+};
+
 
 

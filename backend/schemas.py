@@ -233,3 +233,10 @@ class SessionResponse(CamelModel):
     is_active: bool
     last_active: datetime
     created_at: datetime
+
+class PasswordResetRequest(CamelModel):
+    email: EmailStr
+
+class PasswordResetConfirm(CamelModel):
+    token: str
+    new_password: str

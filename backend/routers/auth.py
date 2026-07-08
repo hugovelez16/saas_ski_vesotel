@@ -472,3 +472,46 @@ async def revoke_session(
     session.is_active = False
     db.commit()
     return {"message": "Session revoked"}
+
+@router.post("/auth/forgot-password")
+async def forgot_password(
+    data: schemas.PasswordResetRequest,
+    db: Session = Depends(get_db)
+):
+    import email_utils
+    user = crud.get_user_by_email(db, data.email)
+    if not user:
+        # Avoid user enumeration by returning 200 anyway
+        return {"message": "If the email exists, a reset link has been sent."}
+    
+    # Generate token
+    token = auth.create_reset_token(user.email)
+    
+    # Send email
+    try:
+        await email_utils.send_password_reset_email(user.email, token)
+    except Exception as e:
+        print(f"Error sending password reset email: {e}")
+        raise HTTPException(status_code=500, detail="Failed to send password reset email.")
+        
+    return {"message": "If the email exists, a reset link has been sent."}
+
+@router.post("/auth/reset-password")
+async def reset_password(
+    data: schemas.PasswordResetConfirm,
+    db: Session = Depends(get_db)
+):
+    email = auth.verify_reset_token(data.token)
+    if not email:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token.")
+        
+    user = crud.get_user_by_email(db, email)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+        
+    # Update password and disable must_change_password
+    user.hashed_password = auth.get_password_hash(data.new_password)
+    user.must_change_password = False
+    db.commit()
+    
+    return {"message": "Password updated successfully."}

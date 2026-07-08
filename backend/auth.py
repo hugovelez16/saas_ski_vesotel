@@ -108,6 +108,24 @@ def create_refresh_token(data: dict):
     to_encode.update({"exp": expire, "iat": now, "type": "refresh", "jti": secrets.token_hex(16)})
     return jwt.encode(to_encode, PRIVATE_KEY, algorithm=ALGORITHM)
 
+def create_reset_token(email: str) -> str:
+    """Creates a short-lived JWT reset token (valid for 2 hours)."""
+    to_encode = {"sub": email, "type": "reset"}
+    now = datetime.utcnow()
+    expire = now + timedelta(hours=2)
+    to_encode.update({"exp": expire, "iat": now, "jti": secrets.token_hex(16)})
+    return jwt.encode(to_encode, PRIVATE_KEY, algorithm=ALGORITHM)
+
+def verify_reset_token(token: str) -> Optional[str]:
+    """Verifies the reset token and returns the email if valid."""
+    try:
+        payload = jwt.decode(token, PUBLIC_KEY, algorithms=[ALGORITHM])
+        if payload.get("type") != "reset":
+            return None
+        return payload.get("sub")
+    except JWTError:
+        return None
+
 def generate_user_tokens(db: Session, user: models.User, company_id: Optional[str] = None, role: Optional[str] = None, force_none: bool = False, scope: Optional[str] = None):
     """
     SRE: Enhanced token generation with platform and company context.

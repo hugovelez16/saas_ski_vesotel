@@ -224,8 +224,7 @@ export default function ManagerBillingPage() {
         const csvConfig = mkConfig({
             fieldSeparator: ',',
             decimalSeparator: '.',
-            useKeysAsHeaders: false,
-            headers: ['Nombre', 'Email', 'Horas Particulares', 'Días Tutoriales', 'Días Coordinados', 'Nocturnidades', 'Total Bruto (€)', 'Total Neto (€)'],
+            useKeysAsHeaders: true,
             filename: `Facturacion_Mensual_${date?.from ? format(date.from, 'MM-yyyy') : 'report'}`
         });
 

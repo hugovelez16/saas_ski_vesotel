@@ -125,9 +125,10 @@ async def create_user_admin(user: schemas.UserCreate, db: Session = Depends(get_
     if db_user:
         raise HTTPException(status_code=400, detail="Email already registered")
     
-    # Option A: Random Password + Email
-    temp_password = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
-    user.password = temp_password # Override with temp
+    # Option A: Random unusable Password
+    import secrets
+    unusable_password = secrets.token_urlsafe(32)
+    user.password = unusable_password # Override with random secure string
     
     created_user = crud.create_user(db=db, user=user)
     
@@ -137,7 +138,8 @@ async def create_user_admin(user: schemas.UserCreate, db: Session = Depends(get_
     
     # Send Email
     if user.send_email:
-        await email_utils.send_welcome_email(user.email, temp_password)
+        reset_token = auth.create_reset_token(user.email)
+        await email_utils.send_welcome_email(user.email, reset_token)
     
     # Company Linkage
     if user.company_id:
@@ -190,20 +192,17 @@ async def reset_password_via_email(user_id: str, db: Session = Depends(get_db), 
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
         
-    # Generate random password
-    temp_password = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
-    
     # Update User
-    user.hashed_password = auth.get_password_hash(temp_password)
     user.must_change_password = True
     db.commit()
     
     # Send Email
     try:
-        await email_utils.send_welcome_email(user.email, temp_password)
+        reset_token = auth.create_reset_token(user.email)
+        await email_utils.send_password_reset_email(user.email, reset_token)
     except Exception as e:
         print(f"Error sending email: {e}")
-        raise HTTPException(status_code=500, detail="Failed to send email. Password was reset but email failed.")
+        raise HTTPException(status_code=500, detail="Failed to send email.")
         
     return {"message": "Password reset and email sent"}
 

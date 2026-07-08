@@ -53,26 +53,55 @@ def get_html_template(title: str, body_content: str) -> str:
 
 # Legacy 2FA Email removed. TOTP (Google Authenticator) is now used.
 
-async def send_welcome_email(email: EmailStr, password: str):
+async def send_welcome_email(email: EmailStr, token: str):
+    frontend_url = os.getenv("FRONTEND_URL", "https://clases.vesotel.com")
+    setup_link = f"{frontend_url}/reset-password?token={token}"
     html_content = get_html_template(
         "Welcome to Vesotel",
         f"""
         <p>Hello,</p>
         <p>Welcome to <strong>Vesotel</strong>! Your account has been successfully created.</p>
-        <p>Here are your temporary credentials:</p>
-        <div style="background: white; padding: 15px; border-radius: 4px; border: 1px solid #e2e8f0; margin: 20px 0;">
-            <p style="margin: 0;"><strong>Email:</strong> {email}</p>
-            <p style="margin: 0;"><strong>Password:</strong> <span style="font-family: monospace; font-size: 1.1em; background: #eee; padding: 2px 6px; border-radius: 3px;">{password}</span></p>
+        <p>Please click the button below to set up your password and access your account:</p>
+        <div style="text-align: center; margin-top: 25px; margin-bottom: 25px;">
+            <a href="{setup_link}" class="button" style="color: white; padding: 12px 24px; background-color: #D32F2F; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">Set Up Password</a>
         </div>
-        <p>Please change your password immediately after logging in.</p>
-        <div style="text-align: center; margin-top: 25px;">
-            <a href="https://clases.vesotel.com" class="button" style="color: white;">Log In Now</a>
-        </div>
+        <p>Or copy and paste this link into your browser:</p>
+        <p style="word-break: break-all; font-size: 0.9em; color: #666;"><a href="{setup_link}">{setup_link}</a></p>
+        <p>This link will expire in 2 hours.</p>
         """
     )
     
     message = MessageSchema(
         subject="Welcome to Vesotel Team",
+        recipients=[email],
+        body=html_content,
+        subtype=MessageType.html
+    )
+    fm = FastMail(conf)
+    await fm.send_message(message)
+
+
+async def send_password_reset_email(email: EmailStr, token: str):
+    frontend_url = os.getenv("FRONTEND_URL", "https://clases.vesotel.com")
+    reset_link = f"{frontend_url}/reset-password?token={token}"
+    html_content = get_html_template(
+        "Reset Your Password",
+        f"""
+        <p>Hello,</p>
+        <p>We received a request to reset your password for your <strong>Vesotel</strong> account.</p>
+        <p>Please click the button below to choose a new password:</p>
+        <div style="text-align: center; margin-top: 25px; margin-bottom: 25px;">
+            <a href="{reset_link}" class="button" style="color: white; padding: 12px 24px; background-color: #D32F2F; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">Reset Password</a>
+        </div>
+        <p>Or copy and paste this link into your browser:</p>
+        <p style="word-break: break-all; font-size: 0.9em; color: #666;"><a href="{reset_link}">{reset_link}</a></p>
+        <p>This link will expire in 2 hours.</p>
+        <p>If you did not request this, you can safely ignore this email.</p>
+        """
+    )
+    
+    message = MessageSchema(
+        subject="Reset Your Vesotel Password",
         recipients=[email],
         body=html_content,
         subtype=MessageType.html

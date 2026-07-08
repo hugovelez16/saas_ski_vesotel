@@ -24,6 +24,8 @@ import {
     revokeUserSession,
     impersonateUser,
     resetPasswordEmail,
+    forgotPassword,
+    resetPassword,
 } from '@/lib/api/users';
 
 const mockedApi = vi.mocked(api);
@@ -139,6 +141,20 @@ describe('Users API Client', () => {
             (mockedApi.post as any).mockResolvedValue({ data: {} });
             await resetPasswordEmail('u-1');
             expect(mockedApi.post).toHaveBeenCalledWith('/users/u-1/reset-password-email');
+        });
+
+        it('forgotPassword should POST /auth/forgot-password', async () => {
+            (mockedApi.post as any).mockResolvedValue({ data: { message: 'sent' } });
+            const result = await forgotPassword('test@test.com');
+            expect(mockedApi.post).toHaveBeenCalledWith('/auth/forgot-password', { email: 'test@test.com' });
+            expect(result.message).toBe('sent');
+        });
+
+        it('resetPassword should POST /auth/reset-password', async () => {
+            (mockedApi.post as any).mockResolvedValue({ data: { message: 'success' } });
+            const result = await resetPassword({ token: 't1', newPassword: 'p1' });
+            expect(mockedApi.post).toHaveBeenCalledWith('/auth/reset-password', { token: 't1', newPassword: 'p1' });
+            expect(result.message).toBe('success');
         });
     });
 
