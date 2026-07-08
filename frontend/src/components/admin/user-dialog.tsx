@@ -45,7 +45,7 @@ const formSchema = z.object({
     lastName: z.string().min(2, "Last name must be at least 2 characters"),
     role: z.enum(["admin", "user"]),
     isActive: z.boolean().default(true),
-    company_id: z.string().optional(),
+    company_id: z.string().min(1, "Please select a company or 'No company'"),
     send_email: z.boolean().default(true),
 });
 
@@ -62,7 +62,7 @@ export function UserDialog() {
             lastName: "",
             role: "user",
             isActive: true,
-            company_id: "",
+            company_id: "none",
             send_email: true,
         },
     });
@@ -86,9 +86,13 @@ export function UserDialog() {
             });
         },
         onError: (error: any) => {
+            const detail = error.response?.data?.detail;
+            const errorMessage = Array.isArray(detail)
+                ? detail.map((err: any) => `${err.loc.join('.')}: ${err.msg}`).join(", ")
+                : (detail || "An unexpected error occurred. Please try again.");
             toast({
                 title: "Error creating user",
-                description: error.response?.data?.detail || "An unexpected error occurred. Please try again.",
+                description: errorMessage,
                 variant: "destructive",
             });
         },
