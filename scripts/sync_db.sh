@@ -32,10 +32,64 @@ else
     exit 1
 fi
 
-# 2. Verificar si el contenedor de origen está corriendo localmente
-if [ "$(docker ps -q -f name=$SRC_CONTAINER)" ]; then
-    echo -e "${GREEN}[OK]${NC} Contenedor de origen ($SRC_CONTAINER) detectado."
-    
+# 2. Configurar servidor de origen (producción)
+echo -e "${BLUE}Configuración del Servidor de Origen (Producción):${NC}"
+read -p "Introduce la IP del servidor de origen [10.192.168.114] (o escribe 'local' para contenedor local): " SRC_IP
+SRC_IP=${SRC_IP:-"10.192.168.114"}
+
+if [ "$SRC_IP" = "local" ]; then
+    # Verificar si el contenedor de origen está corriendo localmente
+    if [ "$(docker ps -q -f name=$SRC_CONTAINER)" ]; then
+        echo -e "${GREEN}[OK]${NC} Contenedor de origen local ($SRC_CONTAINER) detectado."
+        
+        # Preguntar confirmación
+        echo -e "${YELLOW}ADVERTENCIA: Se borrarán todos los datos en DESARROLLO ($DST_CONTAINER)${NC}"
+        read -p "¿Deseas continuar con la sobrescritura? (s/n): " confirm
+        if [[ ! $confirm =~ ^[sS]$ ]]; then
+            echo "Operación cancelada."
+            exit 0
+        fi
+
+        echo -e "${BLUE}Copiando datos desde el contenedor local $SRC_CONTAINER a $DST_CONTAINER...${NC}"
+        
+        # Ejecutar dump y restore en un solo flujo
+        docker exec -t "$SRC_CONTAINER" pg_dump -U "$DB_USER" "$DB_NAME" --clean --if-exists --no-owner --no-privileges | \
+        docker exec -i "$DST_CONTAINER" psql -U "$DB_USER" "$DB_NAME"
+
+        if [ $? -eq 0 ]; then
+            echo -e "${GREEN}¡Éxito! La base de datos de desarrollo ha sido actualizada.${NC}"
+        else
+            echo -e "${RED}[ERROR]${NC} Falló la transferencia de datos."
+        fi
+    else
+        echo -e "${RED}[ERROR]${NC} No se encontró el contenedor '$SRC_CONTAINER' corriendo localmente."
+        exit 1
+    fi
+else
+    # Pedir usuario SSH para la conexión remota
+    read -p "Introduce el usuario SSH para $SRC_IP [usuario]: " SSH_USER
+    SSH_USER=${SSH_USER:-"usuario"}
+
+    # Verificar conectividad SSH
+    echo -e "${BLUE}Comprobando conexión SSH con $SSH_USER@$SRC_IP...${NC}"
+    if ssh -o ConnectTimeout=3 -o BatchMode=yes -o StrictHostKeyChecking=no "$SSH_USER@$SRC_IP" "echo '[OK] SSH'" >/dev/null 2>&1; then
+        echo -e "${GREEN}[OK]${NC} Conexión SSH establecida con éxito."
+    else
+        echo -e "${RED}[ERROR]${NC} No se pudo conectar por SSH a $SSH_USER@$SRC_IP."
+        echo -e "       Asegúrate de tener acceso SSH sin contraseña configurado."
+        exit 1
+    fi
+
+    # Verificar si el contenedor de producción está corriendo en el servidor remoto
+    echo -e "${BLUE}Verificando contenedor remoto $SRC_CONTAINER en $SRC_IP...${NC}"
+    REMOTE_RUNNING=$(ssh "$SSH_USER@$SRC_IP" "docker ps -q -f name=$SRC_CONTAINER" 2>/dev/null)
+    if [ -n "$REMOTE_RUNNING" ]; then
+        echo -e "${GREEN}[OK]${NC} Contenedor remoto de producción ($SRC_CONTAINER) detectado."
+    else
+        echo -e "${RED}[ERROR]${NC} El contenedor ($SRC_CONTAINER) no está corriendo en el servidor remoto $SRC_IP."
+        exit 1
+    fi
+
     # Preguntar confirmación
     echo -e "${YELLOW}ADVERTENCIA: Se borrarán todos los datos en DESARROLLO ($DST_CONTAINER)${NC}"
     read -p "¿Deseas continuar con la sobrescritura? (s/n): " confirm
@@ -44,13 +98,10 @@ if [ "$(docker ps -q -f name=$SRC_CONTAINER)" ]; then
         exit 0
     fi
 
-    echo -e "${BLUE}Copiando datos desde $SRC_CONTAINER a $DST_CONTAINER...${NC}"
+    echo -e "${BLUE}Copiando datos desde remoto $SSH_USER@$SRC_IP ($SRC_CONTAINER) a local $DST_CONTAINER...${NC}"
     
-    # Ejecutar dump y restore en un solo flujo
-    # --clean: Limpia el destino antes de insertar
-    # --if-exists: Evita errores de limpieza si las tablas no existen
-    # --no-owner y --no-privileges: Para evitar conflictos de permisos de roles
-    docker exec -t "$SRC_CONTAINER" pg_dump -U "$DB_USER" "$DB_NAME" --clean --if-exists --no-owner --no-privileges | \
+    # Ejecutar dump desde el servidor remoto a través de SSH e insertar en el contenedor de desarrollo local
+    ssh "$SSH_USER@$SRC_IP" "docker exec -t $SRC_CONTAINER pg_dump -U $DB_USER $DB_NAME --clean --if-exists --no-owner --no-privileges" | \
     docker exec -i "$DST_CONTAINER" psql -U "$DB_USER" "$DB_NAME"
 
     if [ $? -eq 0 ]; then
@@ -58,17 +109,5 @@ if [ "$(docker ps -q -f name=$SRC_CONTAINER)" ]; then
     else
         echo -e "${RED}[ERROR]${NC} Falló la transferencia de datos."
     fi
-
-else
-    echo -e "${YELLOW}[INFO]${NC} No se encontró el contenedor '$SRC_CONTAINER' corriendo localmente."
-    echo -e ""
-    echo -e "Opciones:"
-    echo -e "1. Si el contenedor de producción tiene otro nombre, pásalo como argumento:"
-    echo -e "   ${GREEN}./scripts/sync_db.sh nombre_del_contenedor${NC}"
-    echo -e ""
-    echo -e "2. Si la producción está en un SERVIDOR REMOTO, usa SSH para el dump:"
-    echo -e "   ${BLUE}ssh usuario@tu-servidor 'docker exec -t $SRC_CONTAINER pg_dump -U $DB_USER $DB_NAME --clean --if-exists --no-owner' | docker exec -i $DST_CONTAINER psql -U $DB_USER $DB_NAME${NC}"
-    echo -e ""
-    echo -e "${YELLOW}Nota:${NC} Asegúrate de tener configurado el acceso SSH sin contraseña o usa el comando manualmente."
 fi
 echo -e "${BLUE}===================================================${NC}"
