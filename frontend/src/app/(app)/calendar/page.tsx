@@ -51,15 +51,14 @@ export default function CalendarPage() {
       startTime.setHours(9, 0, 0, 0);
       endTime.setHours(17, 0, 0, 0);
 
-      // If 'Particular' and has specific times, parse them
-      if (log.type === "particular" && log.startTime && log.endTime) {
+      if (log.startTime && log.endTime) {
         try {
           const [startH, startM] = log.startTime.split(':').map(Number);
           const [endH, endM] = log.endTime.split(':').map(Number);
 
           if (!isNaN(startH) && !isNaN(startM) && !isNaN(endH) && !isNaN(endM)) {
             // Reset to log date
-            const baseDate = new Date(log.date);
+            const baseDate = new Date(log.date || log.startDate);
             startTime = new Date(baseDate);
             startTime.setHours(startH, startM, 0, 0);
 
@@ -72,13 +71,8 @@ export default function CalendarPage() {
           console.error("Error parsing time for log", log.id, e);
         }
       } else if (log.type === "tutorial" && log.startDate && log.endDate) {
-        // Tutorials are typically multi-day or full-day. 
-        // Ensure start/end dates are set correctly.
         startTime = new Date(log.startDate);
         endTime = new Date(log.endDate);
-        // Force end of day for the end date? Or keeping it implicitly 00:00 of next day?
-        // Usually date-fns requires inclusive logic or specific handling. 
-        // For now, simple date object is fine, allDay=true handles it.
       }
 
       let color = "sky";

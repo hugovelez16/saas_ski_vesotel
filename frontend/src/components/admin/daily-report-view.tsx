@@ -158,7 +158,7 @@ export function DailyReportView({ companyId }: DailyReportViewProps) {
                                             let duration = 1;
                                             let isFullDay = false;
 
-                                            if (log.type === 'particular' && log.startTime && log.endTime) {
+                                            if (log.startTime && log.endTime) {
                                                 const [sh, sm] = log.startTime.split(':').map(Number);
                                                 const [eh, em] = log.endTime.split(':').map(Number);
 

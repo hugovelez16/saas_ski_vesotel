@@ -155,15 +155,15 @@ export default function ListPage() {
             bVal = b.description || "";
             break;
           case 'duration':
-            if (a.type === 'particular') {
-              aVal = Number(a.durationHours) || 0;
+            if (a.durationHours !== undefined || a.duration !== undefined || (a.startTime && a.endTime)) {
+              aVal = Number(a.durationHours ?? a.duration) || 0;
             } else {
               aVal = a.startDate && a.endDate
                 ? (new Date(a.endDate).getTime() - new Date(a.startDate).getTime())
                 : 0;
             }
-            if (b.type === 'particular') {
-              bVal = Number(b.durationHours) || 0;
+            if (b.durationHours !== undefined || b.duration !== undefined || (b.startTime && b.endTime)) {
+              bVal = Number(b.durationHours ?? b.duration) || 0;
             } else {
               bVal = b.startDate && b.endDate
                 ? (new Date(b.endDate).getTime() - new Date(b.startDate).getTime())
@@ -427,7 +427,7 @@ export default function ListPage() {
                               ? format(parseISO(log.startDate), "dd/MM/yyyy")
                               : "-"}
                         </span>
-                        {log.type === 'particular' && log.startTime && log.endTime && (
+                        {log.startTime && log.endTime && (
                           <span className="text-xs text-muted-foreground whitespace-nowrap">
                             {log.startTime} - {log.endTime}
                           </span>
@@ -509,8 +509,8 @@ export default function ListPage() {
                           }
                         }
 
-                        if (log.type === 'particular') {
-                          return `${log.durationHours || 0} h`;
+                        if (log.type === 'particular' || (log.startTime && log.endTime) || log.durationHours) {
+                          return `${log.durationHours || log.duration || 0} h`;
                         }
                         if (log.startDate && log.endDate) {
                           const start = new Date(log.startDate);

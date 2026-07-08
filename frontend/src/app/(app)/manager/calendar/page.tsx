@@ -88,7 +88,7 @@ export default function ManagerCalendarPage() {
             startTime.setHours(9, 0, 0, 0);
             endTime.setHours(17, 0, 0, 0);
 
-            if (log.type === "particular" && log.startTime && log.endTime) {
+            if (log.startTime && log.endTime) {
                 try {
                     const [startH, startM] = log.startTime.split(':').map(Number);
                     const [endH, endM] = log.endTime.split(':').map(Number);

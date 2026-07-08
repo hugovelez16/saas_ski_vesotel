@@ -72,7 +72,7 @@ export function OverviewV3({ workLogs, companies, activeCompanyId, onAddRecord, 
                 } catch (e) {
                     // Fallback for bad dates
                 }
-            } else if (log.type === 'particular' && logDate) {
+            } else if ((log.type === 'particular' || log.durationHours || log.duration || (log.startTime && log.endTime)) && logDate) {
                 particularDates.add(format(parseISO(logDate), 'yyyy-MM-dd'));
             }
         });
@@ -94,8 +94,8 @@ export function OverviewV3({ workLogs, companies, activeCompanyId, onAddRecord, 
 
         // Sum Hours
         currentMonthLogs.forEach(log => {
-            if (log.type === 'particular') {
-                particularHours += (Number(log.durationHours) || 0);
+            if (log.type === 'particular' || log.durationHours || log.duration || (log.startTime && log.endTime)) {
+                particularHours += (Number(log.durationHours || log.duration) || 0);
             } else if (log.type === 'tutorial') {
                 // Tutorial hours calc: 6 * days.
                 const days = (log.startDate && log.endDate && log.startDate !== log.endDate) ?
@@ -410,7 +410,7 @@ export function OverviewV3({ workLogs, companies, activeCompanyId, onAddRecord, 
                                                                     ? format(parseISO(log.startDate), "dd/MM/yyyy")
                                                                     : "-"}
                                                         </span>
-                                                        {log.type === 'particular' && log.startTime && log.endTime && (
+                                                        {log.startTime && log.endTime && (
                                                             <span className="text-xs text-muted-foreground whitespace-nowrap">
                                                                 {log.startTime} - {log.endTime}
                                                             </span>

@@ -500,16 +500,16 @@ export default function ManagerUserDetailsPage({ params }: { params: Promise<{ u
                         bVal = companies.find((c: any) => c.id === b.companyId)?.name || "";
                         break;
                     case 'duration':
-                        if (a.type === 'particular') {
-                            aVal = Number(a.durationHours) || 0;
+                        if (a.durationHours !== undefined || a.duration !== undefined || (a.startTime && a.endTime)) {
+                            aVal = Number(a.durationHours ?? a.duration) || 0;
                         } else {
                             aVal = a.startDate && a.endDate
                                 ? (new Date(a.endDate).getTime() - new Date(a.startDate).getTime())
                                 : 0;
                         }
 
-                        if (b.type === 'particular') {
-                            bVal = Number(b.durationHours) || 0;
+                        if (b.durationHours !== undefined || b.duration !== undefined || (b.startTime && b.endTime)) {
+                            bVal = Number(b.durationHours ?? b.duration) || 0;
                         } else {
                             bVal = b.startDate && b.endDate
                                 ? (new Date(b.endDate).getTime() - new Date(b.startDate).getTime())
@@ -561,8 +561,8 @@ export default function ManagerUserDetailsPage({ params }: { params: Promise<{ u
             // Check if log falls in current month (checking start date for simplicity)
             const isCurrentMonth = logDate.getMonth() === currentMonth && logDate.getFullYear() === currentYear;
 
-            if (log.type === 'particular') {
-                totalParticularHours += (Number(log.durationHours) || 0);
+            if (log.type === 'particular' || log.durationHours || log.duration || (log.startTime && log.endTime)) {
+                totalParticularHours += (Number(log.durationHours || log.duration) || 0);
                 if (isCurrentMonth) {
                     uniqueDays.add(format(logDate, 'yyyy-MM-dd'));
                 }

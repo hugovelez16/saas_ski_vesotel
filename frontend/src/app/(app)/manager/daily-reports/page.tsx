@@ -315,7 +315,7 @@ export default function ManagerDailyReportPage() {
                                                 let startDecimal = 8;
                                                 let endDecimal = 19;
 
-                                                if (log.type === 'particular' && log.startTime && log.endTime) {
+                                                if (log.startTime && log.endTime) {
                                                     const [sh, sm] = log.startTime.split(':').map(Number);
                                                     const [eh, em] = log.endTime.split(':').map(Number);
                                                     startDecimal = sh + sm / 60;
