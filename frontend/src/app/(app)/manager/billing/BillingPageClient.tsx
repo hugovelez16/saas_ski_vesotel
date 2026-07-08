@@ -9,10 +9,11 @@ import { getWorkLogs } from "@/lib/api/work-logs";
 import { getCompanyMembers, getCompanyRates } from "@/lib/api/companies";
 import { useQuery } from "@tanstack/react-query";
 import { WorkLog, UserCompanyRate } from "@/lib/types";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, Coins, Wallet, Clock, Sparkles } from "lucide-react";
 import { useSearchParams } from "next/navigation";
+import { mkConfig, generateCsv, download } from "export-to-csv";
 
 export default function ManagerBillingPage() {
     const searchParams = useSearchParams();
@@ -129,15 +130,15 @@ export default function ManagerBillingPage() {
                 userMap.set(log.userId, agg);
             }
 
-            const logDate = log.date || log.startDate;
+            const logDate = log.startDate;
 
             agg.row.logs.push(log);
 
             // Calculations
-            const amount = Number(log.amount) || 0;
+            const amount = log.netAmount !== undefined ? Number(log.netAmount) : (Number(log.amount) || 0);
 
             if (log.type === 'particular') {
-                agg.row.particularHours += Number(log.durationHours) || 0;
+                agg.row.particularHours += log.duration !== undefined ? Number(log.duration) : (Number(log.durationHours) || 0);
                 agg.row.particularAmount += amount;
                 agg.row.particularGrossAmount += Number(log.grossAmount) || 0;
             } else if (log.type === 'tutorial') {
@@ -156,14 +157,16 @@ export default function ManagerBillingPage() {
                 }
             }
 
-            if (log.hasCoordination) {
+            const hasCoordination = log.hasCoordination || log.extraData?.opciones?.has_coordination || log.extraData?.opciones?.coordination;
+            if (hasCoordination) {
                 if (logDate) {
                     agg.coordinatedDates.add(logDate);
                 }
                 // We don't have separate coord amount
             }
 
-            if (log.hasNight) {
+            const hasNight = log.hasNight || log.extraData?.opciones?.has_night || log.extraData?.opciones?.night;
+            if (hasNight) {
                 if (log.type === 'tutorial' && log.startDate && log.endDate) {
                     // For tutorials: count all days except the last one (days - 1)
                     try {
@@ -195,13 +198,62 @@ export default function ManagerBillingPage() {
         }));
     }, [workLogs, members]);
 
+    const summaryStats = useMemo(() => {
+        let totalGross = 0;
+        let totalNet = 0;
+        let totalHours = 0;
+        let totalTutorials = 0;
+
+        billingData.forEach(row => {
+            totalGross += row.totalGrossAmount || row.totalAmount;
+            totalNet += row.totalAmount;
+            totalHours += row.particularHours;
+            totalTutorials += row.tutorialDays;
+        });
+
+        return {
+            totalGross,
+            totalNet,
+            totalHours,
+            totalTutorials
+        };
+    }, [billingData]);
+
+    const handleExportCsv = () => {
+        if (billingData.length === 0) return;
+        const csvConfig = mkConfig({
+            fieldSeparator: ',',
+            decimalSeparator: '.',
+            useKeysAsHeaders: false,
+            headers: ['Nombre', 'Email', 'Horas Particulares', 'Días Tutoriales', 'Días Coordinados', 'Nocturnidades', 'Total Bruto (€)', 'Total Neto (€)'],
+            filename: `Facturacion_Mensual_${date?.from ? format(date.from, 'MM-yyyy') : 'report'}`
+        });
+
+        const exportData = billingData.map(row => ({
+            Nombre: row.userName,
+            Email: row.userEmail,
+            'Horas Particulares': row.particularHours.toFixed(2),
+            'Días Tutoriales': row.tutorialDays,
+            'Días Coordinados': row.coordinatedDays,
+            Nocturnidades: row.nightShifts,
+            'Total Bruto (€)': (row.totalGrossAmount || row.totalAmount).toFixed(2),
+            'Total Neto (€)': row.totalAmount.toFixed(2)
+        }));
+
+        const csv = generateCsv(csvConfig)(exportData);
+        download(csvConfig)(csv);
+    };
+
     return (
         <div className="flex flex-col gap-6 p-6">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                <h1 className="text-3xl font-bold tracking-tight">Billing Summary</h1>
-                <div className="flex flex-col sm:flex-row gap-4 items-center">
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Resumen y Facturación</h1>
+                    <p className="text-muted-foreground text-sm">Resumen mensual de actividad y cálculo de costes del equipo.</p>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-4 items-center w-full md:w-auto">
                     <div className="flex items-center gap-2">
-                        <div className="flex border rounded-md shadow-sm">
+                        <div className="flex border rounded-md shadow-sm bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
                             <Button
                                 variant="ghost"
                                 size="icon"
@@ -233,28 +285,89 @@ export default function ManagerBillingPage() {
                             </Button>
                         </div>
                     </div>
-                    {/* Existing DateRangeFilter can remain or be removed if strict month mode is preferred. User said "option to change month by month", implying this is an addition or replacement. Usually replacing the complex range picker with this simple one is cleaner for billing. Or keep both? Keeping both might conflict visually. 
-                    Let's hide the range picker IF we are using month mode? Or just place it next to it?
-                    "change month by month" -> Usually means strict monthly view.
-                    I will keep the DateRangeFilter but prioritize the month switcher visually. */}
+                    
                     <DateRangeFilter date={date} setDate={setDate} />
+                    
+                    {billingData.length > 0 && (
+                        <Button onClick={handleExportCsv} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm flex items-center gap-2 h-9">
+                            <Download className="h-4 w-4" />
+                            Exportar CSV
+                        </Button>
+                    )}
                 </div>
             </div>
 
             {!selectedCompanyId && (
-                <Card className="bg-yellow-50 border-yellow-200">
-                    <CardContent className="pt-6 text-yellow-800">
+                <Card className="bg-yellow-50 border-yellow-200 dark:bg-yellow-950/20 dark:border-yellow-900/50">
+                    <CardContent className="pt-6 text-yellow-800 dark:text-yellow-200">
                         No company selected. Please select a company from the sidebar.
                     </CardContent>
                 </Card>
             )}
 
             {selectedCompanyId && (
-                <BillingTable
-                    data={billingData}
-                    isLoading={isLoadingLogs || isLoadingMembers}
-                    settings={company?.settings}
-                />
+                <>
+                    {/* KPI Cards Grid */}
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                        <Card className="border-emerald-100 dark:border-emerald-950 shadow-sm hover:shadow-md transition-all duration-300">
+                            <CardHeader className="flex flex-row items-center justify-between pb-2">
+                                <CardTitle className="text-sm font-medium text-slate-500 uppercase tracking-wider">Coste Bruto (Empresa)</CardTitle>
+                                <Coins className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                                    {new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(summaryStats.totalGross)}
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1">Coste real consolidado</p>
+                            </CardContent>
+                        </Card>
+
+                        <Card className="border-indigo-100 dark:border-indigo-950 shadow-sm hover:shadow-md transition-all duration-300">
+                            <CardHeader className="flex flex-row items-center justify-between pb-2">
+                                <CardTitle className="text-sm font-medium text-slate-500 uppercase tracking-wider">Coste Neto (Personal)</CardTitle>
+                                <Wallet className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                                    {new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(summaryStats.totalNet)}
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1">Suma líquida percibida</p>
+                            </CardContent>
+                        </Card>
+
+                        <Card className="border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-all duration-300">
+                            <CardHeader className="flex flex-row items-center justify-between pb-2">
+                                <CardTitle className="text-sm font-medium text-slate-500 uppercase tracking-wider">Horas Particulares</CardTitle>
+                                <Clock className="h-5 w-5 text-slate-600 dark:text-slate-400" />
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                                    {summaryStats.totalHours.toFixed(2)} h
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1">Tiempo de servicio regular</p>
+                            </CardContent>
+                        </Card>
+
+                        <Card className="border-amber-100 dark:border-amber-950 shadow-sm hover:shadow-md transition-all duration-300">
+                            <CardHeader className="flex flex-row items-center justify-between pb-2">
+                                <CardTitle className="text-sm font-medium text-slate-500 uppercase tracking-wider">Días Tutoriales</CardTitle>
+                                <Sparkles className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                                    {summaryStats.totalTutorials} días
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1">Días de formación/tutoriales</p>
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    <BillingTable
+                        data={billingData}
+                        isLoading={isLoadingLogs || isLoadingMembers}
+                        settings={company?.settings}
+                    />
+                </>
             )}
         </div>
     );

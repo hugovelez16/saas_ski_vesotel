@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 
 
 import { useSearchParams } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getCompaniesDetailed } from "@/lib/api/companies";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
@@ -26,6 +26,7 @@ import { WorkLog } from "@/lib/types";
 export default function ManagerShiftsPage() {
     const { user } = useAuth();
     const searchParams = useSearchParams();
+    const queryClient = useQueryClient();
     const [filters, setFilters] = useState<Record<string, any>>({});
 
     // Fetch companies
@@ -59,6 +60,19 @@ export default function ManagerShiftsPage() {
             }));
     }, [selectedCompany]);
 
+    const typeOptions = useMemo(() => {
+        if (!selectedCompany?.worklogDefinitions) {
+            return [
+                { label: "Particular", value: "particular" },
+                { label: "Tutorial", value: "tutorial" }
+            ];
+        }
+        return Object.keys(selectedCompany.worklogDefinitions).map(key => ({
+            label: key.charAt(0).toUpperCase() + key.slice(1),
+            value: key
+        }));
+    }, [selectedCompany]);
+
     const logsWithMeta = useMemo(() => {
         return workLogs.map(log => {
             const member = selectedCompany?.members.find(m => m.userId === log.userId);
@@ -89,7 +103,7 @@ export default function ManagerShiftsPage() {
     const filterConfig: FilterConfig[] = [
         { id: "date", label: "Rango de fechas", type: "date-range" },
         { id: "userId", label: "Usuario", type: "select", options: memberOptions },
-        { id: "type", label: "Tipo", type: "select", options: [{ label: "Particular", value: "particular" }, { label: "Tutorial", value: "tutorial" }] },
+        { id: "type", label: "Tipo", type: "select", options: typeOptions },
     ];
 
     return (
@@ -107,8 +121,10 @@ export default function ManagerShiftsPage() {
                     companies={companies}
                     fixedCompanyId={selectedCompanyId || undefined}
                     showUserColumn={true}
-                    readOnly={true}
-                    onUpdate={() => {}}
+                    readOnly={false}
+                    onUpdate={() => {
+                        queryClient.invalidateQueries({ queryKey: ["companyWorkLogs", selectedCompanyId] });
+                    }}
                     isLoading={loadingLogs}
                 />
 

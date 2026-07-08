@@ -39,9 +39,9 @@ interface BillingTableProps {
 export function BillingTable({ data, isLoading, settings }: BillingTableProps) {
     const [selectedRow, setSelectedRow] = useState<BillingRow | null>(null);
 
-    const showTutorials = settings?.features?.tutorials !== false;
-    const showCoordination = settings?.features?.coordination !== false;
-    const showNights = settings?.features?.night_shifts !== false;
+    const showTutorials = (settings?.modules?.tutorials ?? settings?.features?.tutorials) !== false;
+    const showCoordination = (settings?.modules?.coordination ?? settings?.features?.coordination) !== false;
+    const showNights = (settings?.modules?.night_shifts ?? settings?.features?.night_shifts) !== false;
 
     const columns = useMemo<ColumnDef<BillingRow>[]>(() => {
         const cols: ColumnDef<BillingRow>[] = [

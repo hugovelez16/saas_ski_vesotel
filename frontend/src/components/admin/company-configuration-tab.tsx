@@ -77,7 +77,7 @@ export function CompanyConfigurationTab({ company }: CompanyConfigurationTabProp
             </Card>
 
             {/* 4. Definiciones de Datos (Legacy/Existing) - Only for Platform Admin */}
-            {user?.role === 'admin' && (
+            {(user?.role === 'admin' || user?.activeRole === 'manager') && (
                 <Card className="border-slate-200 shadow-sm">
                     <CardHeader className="bg-slate-50/50">
                         <CardTitle className="text-xl">Definiciones Técnicas</CardTitle>

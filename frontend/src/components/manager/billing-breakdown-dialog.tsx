@@ -59,32 +59,32 @@ export function BillingBreakdownDialog({ open, onOpenChange, row }: BillingBreak
                                 <TableRow>
                                     <TableCell className="font-medium">Horas Particulares</TableCell>
                                     <TableCell className="text-right">{row.particularHours.toFixed(2)} h</TableCell>
-                                    <TableCell className="text-right">{formatCurrency(row.particularAmount)}</TableCell>
+                                    <TableCell className="text-right">{formatCurrency(row.particularGrossAmount || row.particularAmount)}</TableCell>
                                 </TableRow>
                                 {row.tutorialDays > 0 && (
                                     <TableRow>
                                         <TableCell className="font-medium">Días Tutoriales</TableCell>
                                         <TableCell className="text-right">{row.tutorialDays} días</TableCell>
-                                        <TableCell className="text-right">{formatCurrency(row.tutorialAmount)}</TableCell>
+                                        <TableCell className="text-right">{formatCurrency(row.tutorialGrossAmount || row.tutorialAmount)}</TableCell>
                                     </TableRow>
                                 )}
                                 {row.coordinatedDays > 0 && (
                                     <TableRow>
                                         <TableCell className="font-medium">Coordinación</TableCell>
                                         <TableCell className="text-right">{row.coordinatedDays} días</TableCell>
-                                        <TableCell className="text-right">{formatCurrency(row.coordinatedAmount)}</TableCell>
+                                        <TableCell className="text-right">{formatCurrency(row.coordinatedGrossAmount || row.coordinatedAmount)}</TableCell>
                                     </TableRow>
                                 )}
                                 {row.nightShifts > 0 && (
                                     <TableRow>
                                         <TableCell className="font-medium">Nocturnidad</TableCell>
                                         <TableCell className="text-right">{row.nightShifts} turnos</TableCell>
-                                        <TableCell className="text-right">{formatCurrency(row.nightAmount)}</TableCell>
+                                        <TableCell className="text-right">{formatCurrency(row.nightGrossAmount || row.nightAmount)}</TableCell>
                                     </TableRow>
                                 )}
                                 <TableRow className="bg-muted/50 font-bold">
                                     <TableCell colSpan={2}>Total</TableCell>
-                                    <TableCell className="text-right text-emerald-600">{formatCurrency(row.totalAmount)}</TableCell>
+                                    <TableCell className="text-right text-emerald-600">{formatCurrency(row.totalGrossAmount || row.totalAmount)}</TableCell>
                                 </TableRow>
                             </TableBody>
                         </Table>
