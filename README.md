@@ -101,19 +101,19 @@ El sistema utiliza una arquitectura ingeniosa para exponer la aplicación de for
 
 ```mermaid
 graph LR
-    User[Usuarios (Internet)] -->|HTTPS clases.vesotel.com| Nginx[Servidor Web Público Nginx]
+    User["Usuarios (Internet)"] -->|HTTPS clases.vesotel.com| Nginx[Servidor Web Público Nginx]
     
     subgraph VPS / Servidor Público
         Nginx -->|Reenvío de tráfico| Port[Puerto Local VPS]
     end
 
-    Port <-->|Túnel SSH Inverso| HomeProxy[Reverse Proxy Caddy (En Casa)]
+    Port <-->|Túnel SSH Inverso| HomeProxy["Reverse Proxy Caddy (En Casa)"]
     
     subgraph Red Local / Casa
         HomeProxy -->|Rutas /api| BackendProd[Contenedor Backend Prod]
         HomeProxy -->|Peticiones normales| FrontendProd[Contenedor Frontend Prod]
         
-        Dev[Servidor Local (Desarrollo y Repo)] -.->|Se conecta a| HomeProxy
+        Dev["Servidor Local (Desarrollo y Repo)"] -.->|Se conecta a| HomeProxy
     end
 ```
 
