@@ -1,107 +1,136 @@
 # Vesotel Gestor Jornada
 
-Sistema de gestión de jornadas laborales y registros de trabajo (Work Logs) diseñado para entornos multi-empresa. El proyecto utiliza una arquitectura moderna basada en microservicios contenerizados, con un backend robusto en Python y un frontend reactivo en Next.js.
+Sistema SaaS para la gestión de jornadas laborales y registros de trabajo (Work Logs), diseñado para entornos multi-empresa. Utiliza una arquitectura moderna basada en microservicios contenerizados, con un backend robusto en Python (FastAPI) y un frontend reactivo en Next.js.
 
-## Arquitectura del Sistema
+---
 
-El sistema se compone de tres pilares fundamentales:
+## 🏛️ Arquitectura del Sistema
 
-1.  **Backend API**: Desarrollado con FastAPI, encargado de la lógica de negocio, autenticación JWT, gestión de sesiones y comunicación con la base de datos.
-2.  **Frontend**: Desarrollado con Next.js (App Router), proporcionando una interfaz de usuario moderna, responsiva y optimizada para la gestión administrativa y de usuarios.
-3.  **Base de Datos**: PostgreSQL para el almacenamiento persistente, gestionado mediante SQLAlchemy (ORM) y Alembic para el control de versiones del esquema.
+El sistema sigue una arquitectura de microservicios contenerizados, separando claramente las responsabilidades.
 
-## Stack Tecnológico
-
-### Backend
-*   **Framework**: FastAPI (Python 3.12+)
-*   **ORM**: SQLAlchemy 2.0+
-*   **Migraciones**: Alembic
-*   **Seguridad**: JWT (JSON Web Tokens) con firma RS256, Passlib (bcrypt), 2FA (TOTP con PyOTP y cifrado de secretos).
-*   **Servidor**: Uvicorn con Gunicorn para producción.
-
-### Frontend
-*   **Framework**: Next.js 14+ (App Router)
-*   **Lenguaje**: TypeScript
-*   **Estilos**: Tailwind CSS & Lucide React para iconografía.
-*   **Gestión de Estado**: React Context API & Hooks.
-
-### Infraestructura
-*   **Contenerización**: Docker y Docker Compose v2+.
-*   **Base de Datos**: PostgreSQL 16.
-*   **Caché/Sesiones**: Redis (para gestión de estados y rate limiting).
-*   **CI/CD**: GitHub Actions con Self-hosted runner.
-
-## Funcionalidades Avanzadas SaaS
-
-### Dynamic Scoping (Contexto Ágil)
-El sistema permite a los usuarios alternar entre diferentes empresas y roles sin cerrar sesión.
-*   El contexto activo (`company_id` y `role`) se almacena directamente en el JWT.
-*   Endpoint `/auth/switch-scope` permite cambiar de contexto de forma dinámica.
-*   Los permisos en el backend se validan contra el "active scope" del token actual.
-
-### Impersonación de Usuarios
-Los administradores globales pueden auditar cuentas de usuario directamente:
-*   **Backup de Sesión**: Al impersonar, se guardan "backup cookies" de la sesión de administrador.
-*   **Restauración**: Al terminar la impersonación, se restauran las credenciales originales sin necesidad de re-autenticación.
-*   **Auditoría**: Todas las acciones realizadas bajo impersonación quedan registradas en el sistema.
-
-### Seguridad y 2FA
-*   **TOTP**: Autenticación de doble factor mediante aplicaciones como Google Authenticator.
-*   **Cifrado**: Los secretos de OTP se almacenan cifrados en la base de datos (AES).
-*   **Database Readiness**: El backend incluye un sistema de reintentos inteligente al arranque para esperar la disponibilidad de la base de datos antes de iniciar los servicios.
-
-## Estructura del Repositorio
-
-```text
-.
-├── backend/              # Lógica de servidor y API
-│   ├── auth.py           # Gestión de JWT, Sesiones y 2FA
-│   ├── crud.py           # Operaciones de base de datos
-│   ├── main.py           # Punto de entrada y endpoints FastAPI
-│   ├── models.py         # Definición de modelos (SQLAlchemy)
-│   ├── schemas.py        # Validación de datos (Pydantic)
-│   └── migrations/       # Control de versiones DB (Alembic)
-├── frontend/             # Interfaz de usuario Next.js
-│   ├── src/app/          # App Router (Pages y Layouts)
-│   ├── src/components/   # Componentes de UI reutilizables
-│   └── src/lib/          # Utilidades y cliente de API
-├── docker-compose.dev.yml  # Configuración con hot-reload para desarrollo
-└── docker-compose.prod.yml # Configuración optimizada para despliegue
+```mermaid
+graph TD
+    Client[Cliente Web / Navegador] -->|HTTPS| ReverseProxy[Reverse Proxy]
+    
+    subgraph Servidor
+        ReverseProxy -->|Peticiones 'normales'| Frontend[Frontend Next.js]
+        ReverseProxy -->|Rutas '/api'| Backend[Backend FastAPI]
+        
+        subgraph Contenedores Docker
+            Frontend
+            Backend
+            Backend -->|SQLAlchemy| DB[(PostgreSQL 16)]
+            Backend -->|Cache/Sesiones| Redis[(Redis)]
+        end
+    end
 ```
 
-## Configuración del Entorno de Desarrollo
+### Componentes Principales
 
-### Requisitos Previos
-*   Docker y Docker Compose (v2 o superior).
-*   Archivo `.env` configurado en la raíz del proyecto.
+| Componente | Tecnología | Responsabilidad |
+| :--- | :--- | :--- |
+| **Backend API** | FastAPI (Python 3.12+) | Lógica de negocio, autenticación JWT, gestión de sesiones, comunicación con base de datos. |
+| **Frontend** | Next.js 14+ (App Router) | Interfaz de usuario moderna y responsiva, consumiendo el API del backend. |
+| **Base de Datos** | PostgreSQL 16 | Almacenamiento persistente. Migraciones gestionadas con Alembic y SQLAlchemy. |
+| **Caché** | Redis | Gestión de estados temporales y rate limiting. |
 
-### Pasos para Iniciar
-1. Clonar el repositorio.
-2. Crear el archivo `.env` basándose en `.env.example`.
-3. Levantar los servicios:
-   ```bash
-   docker compose -f docker-compose.dev.yml up -d --build
-   ```
-4. El sistema cuenta con **Hot-Reload**:
-    *   Backend: Reinicio automático vía Uvicorn.
-    *   Frontend: Fast Refresh de Next.js.
+---
 
-### Gestión de Migraciones (Alembic)
-Generar nueva migración:
+## 🏗️ Infraestructura y Entornos
+
+El proyecto gestiona de forma aislada el desarrollo y la producción mediante configuraciones específicas de Docker Compose.
+
+### 1. Servidor de Desarrollo (`docker-compose.dev.yml`)
+
+El entorno local está diseñado para maximizar la agilidad del desarrollador mediante **Hot-Reload**.
+
+- **Backend**: Utiliza `uvicorn` con la bandera `--reload` para reiniciar automáticamente el servidor ante cambios en el código.
+- **Frontend**: Aprovecha el Fast Refresh de Next.js, reflejando instantáneamente los cambios en la UI.
+- **Volúmenes**: Los directorios locales se montan directamente en los contenedores para sincronizar el código fuente.
+
+**Cómo levantar el entorno de desarrollo:**
 ```bash
-docker compose -f docker-compose.dev.yml exec backend python3 -m alembic revision --autogenerate -m "cambios"
-```
-Aplicar migraciones:
-```bash
-docker compose -f docker-compose.dev.yml exec backend python3 -m alembic upgrade head
+docker compose -f docker-compose.dev.yml up -d --build
 ```
 
-## Despliegue CI/CD
+### 2. Servidor de Producción (`docker-compose.prod.yml`)
 
-El despliegue es automático al realizar un push a la rama `main`:
-1. El Runner actualiza el código en el servidor.
-2. Se reconstruyen los contenedores con `docker-compose.prod.yml`.
-3. Se aplican las migraciones pendientes automáticamente.
+El entorno de producción está optimizado para rendimiento, seguridad y estabilidad.
+
+- **Backend**: Desplegado utilizando `gunicorn` con múltiples workers (procesos) manejando instancias de `uvicorn`.
+- **Frontend**: Se sirve un build de producción optimizado (estático/server-rendered).
+- **Volúmenes**: Únicamente se utilizan volúmenes para persistencia de datos (PostgreSQL, Redis), no se monta código fuente en tiempo real.
+
+---
+
+## 🚀 Pipeline CI/CD
+
+El despliegue está automatizado mediante GitHub Actions y un Self-hosted Runner instalado en el servidor de producción.
+
+```mermaid
+sequenceDiagram
+    participant Dev as Desarrollador
+    participant GH as GitHub (Actions)
+    participant GHCR as GitHub Container Registry
+    participant Runner as Self-hosted Runner (Prod)
+    participant Docker as Docker Compose
+
+    Dev->>GH: Push a la rama 'main'
+    GH->>GHCR: Construye imágenes (Front/Back) y hace push
+    GH->>Runner: Trigger Deploy Job
+    Runner->>GHCR: docker compose pull (Descarga nuevas imágenes)
+    Runner->>Docker: Levanta BD (PostgreSQL) y espera disponibilidad
+    Runner->>Docker: Ejecuta migraciones (Alembic)
+    Runner->>Docker: Reinicia contenedores con nuevas imágenes
+    Runner->>Runner: Limpieza de imágenes huérfanas
+```
+
+**Flujo de despliegue (Despliegue Seguro GHCR):**
+1. Al realizar un push o merge a la rama `main`, GitHub Actions compila las imágenes Docker del Frontend y Backend en la nube (Ubuntu).
+2. Las imágenes compiladas se suben al GitHub Container Registry (GHCR).
+3. Se dispara el job de despliegue en el Self-hosted Runner (Servidor de Producción).
+4. El servidor descarga (`pull`) las imágenes ya compiladas desde GHCR (más rápido y seguro).
+5. Levanta la base de datos y espera a que esté lista antes de ejecutar las migraciones de Alembic en un contenedor temporal.
+6. Finalmente, reinicia todos los servicios con las imágenes actualizadas y realiza limpieza (`prune`).
+
+---
+
+## 🔐 Acceso Seguro e Infraestructura Híbrida (Túnel SSH)
+
+El sistema utiliza una arquitectura ingeniosa para exponer la aplicación de forma segura mientras se mantienen los servidores (producción y desarrollo) en una red privada local.
+
+```mermaid
+graph LR
+    User[Usuarios (Internet)] -->|HTTPS clases.vesotel.com| Nginx[Servidor Web Público Nginx]
+    
+    subgraph VPS / Servidor Público
+        Nginx -->|Reenvío de tráfico| Port[Puerto Local VPS]
+    end
+
+    Port <-->|Túnel SSH Inverso| HomeProxy[Reverse Proxy Caddy (En Casa)]
+    
+    subgraph Red Local / Casa
+        HomeProxy -->|Rutas /api| BackendProd[Contenedor Backend Prod]
+        HomeProxy -->|Peticiones normales| FrontendProd[Contenedor Frontend Prod]
+        
+        Dev[Servidor Local (Desarrollo y Repo)] -.->|Se conecta a| HomeProxy
+    end
+```
+
+**Cómo funciona el enrutamiento y acceso:**
+1. **Servidor Público:** Un servidor Nginx recibe el tráfico público en `clases.vesotel.com` y gestiona los certificados Let's Encrypt. Todo el tráfico se reenvía a un puerto interno de este VPS.
+2. **Túnel SSH:** Un túnel SSH conecta constantemente el servidor público (VPS) con el reverse proxy Caddy instalado en el servidor físico en casa, apuntando a ese puerto interno.
+3. **Reverse Proxy (Caddy):** Al final del túnel en la red local se encuentra un reverse proxy Caddy. Caddy recibe el tráfico rebotado por el túnel y actúa como enrutador final, enviando las llamadas `/api` al contenedor de Backend y el resto del tráfico al contenedor Frontend.
+4. **Desarrollo vs Producción:** Para el desarrollo de la aplicación, te conectas al servidor donde reside el repositorio y los contenedores de desarrollo, y el reverse proxy (Caddy) es capaz de redirigir o reenviar el tráfico al servidor de producción, facilitando un flujo de trabajo sin fisuras.
+
+---
+
+## 🛠️ Características Clave del SaaS
+
+*   **Dynamic Scoping (Contexto Ágil)**: Permite cambiar entre diferentes empresas y roles sin cerrar sesión, validando permisos mediante el "active scope" del JWT.
+*   **Impersonación de Usuarios**: Administradores pueden auditar cuentas guardando la sesión original en "backup cookies" para restaurarla sin re-autenticar.
+*   **Seguridad 2FA**: Autenticación de doble factor vía TOTP. Secretos almacenados de forma cifrada (AES) en la base de datos.
+*   **Database Readiness**: Sistema de reintentos inteligente en el backend para esperar la disponibilidad de la base de datos al iniciar contenedores.
 
 ---
 *Vesotel - Gestión Eficiente de Entornos Multi-Empresa*
