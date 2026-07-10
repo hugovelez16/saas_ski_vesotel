@@ -50,6 +50,26 @@ services:
       - app
     restart: unless-stopped
 
+  pgbackups:
+    image: prodrigestivill/postgres-backup-local
+    restart: unless-stopped
+    volumes:
+      # Montaje hacia la carpeta NFS
+      - /mnt/nas_backups/clases-vesotel:/backups
+    networks:
+      - db
+    depends_on:
+      - postgres
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - SCHEDULE=@daily
+      - BACKUP_KEEP_DAYS=7
+      - BACKUP_KEEP_WEEKS=4
+      - BACKUP_KEEP_MONTHS=3
+
 
 volumes:
   postgres_data:
