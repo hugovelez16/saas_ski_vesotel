@@ -59,9 +59,16 @@ def read_companies_detailed(db: Session = Depends(get_db), current_user: models.
 
     for m in user_memberships:
         company = m.company # The Company relationship
-        if company and company.settings:
-             modules = company.settings.get("modules", {})
-             if modules.get("worker_daily_report", True) is True:
+        if company:
+             settings = company.settings or {}
+             modules = settings.get("modules", {})
+             features = settings.get("features", {})
+             
+             mod_val = modules.get("worker_daily_report")
+             feat_val = features.get("worker_daily_report")
+             val = mod_val if mod_val is not None else (feat_val if feat_val is not None else True)
+             
+             if val is True:
                  allowed_company_ids.add(company.id)
 
     if allowed_company_ids:

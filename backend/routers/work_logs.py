@@ -118,6 +118,33 @@ def read_work_logs(
                  target_user_id = None # See all logs for this company
                  if user_id:
                      target_user_id = user_id # Filter specific user in this company
+             else:
+                 # Check if the company has worker_daily_report enabled and the user is an active member
+                 membership = db.query(models.CompanyMember).filter(
+                     models.CompanyMember.user_id == current_user.id,
+                     models.CompanyMember.company_id == target_company_id,
+                     models.CompanyMember.is_active == True
+                 ).first()
+                 
+                 if membership:
+                     company = db.query(models.Company).filter(models.Company.id == target_company_id).first()
+                     if company:
+                         settings = company.settings or {}
+                         modules = settings.get("modules", {})
+                         features = settings.get("features", {})
+                         
+                         # Check both places just like frontend, default to True if missing
+                         mod_val = modules.get("worker_daily_report")
+                         feat_val = features.get("worker_daily_report")
+                         
+                         # ?? operator logic in JS: if mod_val is not None, use it. Else if feat_val is not None, use it. Else use True.
+                         val = mod_val if mod_val is not None else (feat_val if feat_val is not None else True)
+                         
+                         if val is True:
+                             is_supervisor_request = True
+                             target_user_id = None
+                             if user_id:
+                                 target_user_id = user_id
 
         if is_supervisor_request:
               final_user_id = target_user_id
