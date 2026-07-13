@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getModules, getSubscriptions, createModule, createSubscription, updateSubscription } from "@/lib/api/modules";
+import { AxiosError } from "axios";
 import { AppModule, ModuleSubscription } from "@/lib/types";
 import { ModuleCard } from "@/components/modules/ModuleCard";
 import { Button } from "@/components/ui/button";
@@ -39,7 +40,7 @@ export default function AdminModulesPage() {
             setNewModule({ codeName: "", name: "", description: "", targetScope: "both" });
             toast.success("Módulo creado correctamente.");
         },
-        onError: (e: any) => toast.error(e?.response?.data?.detail ?? "Error al crear el módulo."),
+        onError: (e: AxiosError<{ detail?: string }>) => toast.error(e?.response?.data?.detail ?? "Error al crear el módulo."),
     });
 
     const cancelSubMutation = useMutation({
@@ -59,7 +60,7 @@ export default function AdminModulesPage() {
             setNewSub({ scope: "company", targetId: "", status: "active", expiresAt: "", notes: "" });
             toast.success("Suscripción creada correctamente.");
         },
-        onError: (e: any) => toast.error(e?.response?.data?.detail ?? "Error al crear la suscripción."),
+        onError: (e: AxiosError<{ detail?: string }>) => toast.error(e?.response?.data?.detail ?? "Error al crear la suscripción."),
     });
 
     // ─── Create Module Form State ────────────────────────────────────────────
