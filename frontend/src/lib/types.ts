@@ -252,4 +252,6 @@ export interface ModuleSubscription {
     createdAt: string;
     updatedAt: string;
     module?: AppModule;
+    company?: Company;
+    user?: User;
 }
