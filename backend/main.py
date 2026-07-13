@@ -13,7 +13,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 
 # Import modular routers
-from routers import auth, users, work_logs, companies
+from routers import auth, users, work_logs, companies, modules
 
 def perform_session_cleanup():
     """
@@ -125,6 +125,7 @@ app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(work_logs.router)
 app.include_router(companies.router)
+app.include_router(modules.router)
 
 if __name__ == "__main__":
     import uvicorn

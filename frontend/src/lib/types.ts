@@ -225,3 +225,31 @@ export interface UserCompanyRate {
     deductionExtra?: number;
     user?: UserProfile;
 }
+
+// ─── Módulos y Suscripciones ──────────────────────────────────────────────
+
+export interface AppModule {
+    id: string;
+    codeName: string;
+    name: string;
+    description?: string | null;
+    isActive: boolean;
+    targetScope: 'company' | 'user' | 'both';
+    priceMonthly?: number | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface ModuleSubscription {
+    id: string;
+    moduleId: string;
+    companyId?: string | null;
+    userId?: string | null;
+    scope: 'company' | 'user';
+    status: 'active' | 'trial' | 'cancelled' | 'expired';
+    expiresAt?: string | null;
+    notes?: string | null;
+    createdAt: string;
+    updatedAt: string;
+    module?: AppModule;
+}

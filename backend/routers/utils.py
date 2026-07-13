@@ -1,6 +1,10 @@
 from sqlalchemy.orm import Session
 from typing import Any
+from fastapi import Depends, HTTPException
+from database import get_db
 import models
+import auth
+import crud
 
 def check_manager_access(db: Session, manager: models.User, target_user_id: str) -> bool:
     """
@@ -39,3 +43,40 @@ def is_manager_of_company(db: Session, user: models.User, company_id: Any) -> bo
         return True
         
     return False
+
+
+def require_module(code_name: str):
+    """
+    FastAPI dependency factory. Bloquea el acceso a un endpoint si el
+    usuario actual (o su empresa activa) no tiene activo el módulo indicado.
+
+    Uso:
+        @router.get("/some-feature")
+        def my_endpoint(
+            db: Session = Depends(get_db),
+            current_user: models.User = Depends(auth.get_verified_user),
+            _: None = Depends(require_module("export_pdf"))
+        ):
+            ...
+    """
+    def dependency(
+        current_user: models.User = Depends(auth.get_verified_user),
+        db: Session = Depends(get_db)
+    ):
+        # Platform Admin siempre tiene acceso a todo
+        if getattr(current_user, "is_platform_admin", False):
+            return
+
+        user_id = str(current_user.id)
+        active_cid = getattr(current_user, "active_company_id", None)
+        company_id = str(active_cid) if active_cid else None
+
+        has_access = crud.user_has_module(db, user_id, company_id, code_name)
+        if not has_access:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Tu cuenta no tiene acceso al módulo '{code_name}'. Contacta con el administrador."
+            )
+
+    return dependency
+

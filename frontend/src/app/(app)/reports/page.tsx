@@ -410,141 +410,20 @@ export default function ReportsPage() {
                 return;
             }
 
-            // Group by Month
-            const monthsMap = new Map<string, { date: Date, logs: WorkLog[] }>();
-
-            logs.forEach(log => {
-                const date = new Date(log.date || log.startDate || '');
-                const key = format(date, 'yyyy-MM');
-                if (!monthsMap.has(key)) {
-                    monthsMap.set(key, { date: new Date(date), logs: [] });
-                }
-                monthsMap.get(key)!.logs.push(log);
+            // Generar el texto utilizando el sistema modular
+            const company = companies.find(c => c.id === selectedCompanyId);
+            
+            const { generateTextReport } = await import("@/lib/reports/textGenerators");
+            
+            const fullText = generateTextReport(logs, {
+                company,
+                companyId: selectedCompanyId,
+                userId: selectedUserId,
+                startDate: range.start,
+                endDate: range.end
             });
 
-            // Sort months
-            const sortedMonths = Array.from(monthsMap.values()).sort((a, b) => a.date.getTime() - b.date.getTime());
-
-            let fullText = "";
-
-            sortedMonths.forEach(monthData => {
-                const monthName = format(monthData.date, 'MMMM', { locale: es });
-                const monthHeader = `Mes de ${monthName.charAt(0).toUpperCase() + monthName.slice(1)}`;
-
-                let monthBody = "";
-                let totalHours = 0;
-                let totalTutorials = 0;
-
-                // Use Sets to track unique dates for nights and coordinations
-                const nightDates = new Set<string>();
-                const coordDates = new Set<string>();
-
-                // Map to group particular hours by day
-                const particularByDay = new Map<string, { hours: number, hasNight: boolean, hasCoord: boolean }>();
-
-                // Map to track tutorial days with their info
-                const tutorialByDay = new Map<string, { text: string, hasNight: boolean, hasCoord: boolean }>();
-
-                monthData.logs.forEach(log => {
-                    if (log.type === 'particular') {
-                        const d = new Date(log.date || '');
-                        const dateStr = format(d, 'yyyy-MM-dd');
-
-                        // Add to night/coord sets if applicable
-                        if (log.hasNight) nightDates.add(dateStr);
-                        if (log.hasCoordination) coordDates.add(dateStr);
-
-                        // Group hours by day
-                        if (!particularByDay.has(dateStr)) {
-                            particularByDay.set(dateStr, { hours: 0, hasNight: false, hasCoord: false });
-                        }
-                        const dayData = particularByDay.get(dateStr)!;
-                        dayData.hours += log.durationHours || 0;
-                        if (log.hasNight) dayData.hasNight = true;
-                        if (log.hasCoordination) dayData.hasCoord = true;
-
-                    } else if (log.type === 'tutorial') {
-                        const start = new Date(log.startDate!);
-                        const end = new Date(log.endDate!);
-
-                        // Expand days for nights and coordinations
-                        const allDays: Date[] = [];
-                        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-                            allDays.push(new Date(d));
-                        }
-
-                        // For nights: count all days except the last one (days - 1)
-                        if (log.hasNight) {
-                            allDays.slice(0, -1).forEach(d => {
-                                if (format(d, 'yyyy-MM') === format(monthData.date, 'yyyy-MM')) {
-                                    nightDates.add(format(d, 'yyyy-MM-dd'));
-                                }
-                            });
-                        }
-
-                        // For coordinations: count all days
-                        if (log.hasCoordination) {
-                            allDays.forEach(d => {
-                                if (format(d, 'yyyy-MM') === format(monthData.date, 'yyyy-MM')) {
-                                    coordDates.add(format(d, 'yyyy-MM-dd'));
-                                }
-                            });
-                        }
-
-                        // Expand days for display
-                        allDays.forEach((d, index) => {
-                            if (format(d, 'yyyy-MM') === format(monthData.date, 'yyyy-MM')) {
-                                const dateStr = format(d, 'yyyy-MM-dd');
-                                const isLastDay = index === allDays.length - 1;
-
-                                tutorialByDay.set(dateStr, {
-                                    text: `Tutorial: ${log.description || 'Tutorial'}`,
-                                    hasNight: !!log.hasNight && !isLastDay, // Last day doesn't have night
-                                    hasCoord: !!log.hasCoordination
-                                });
-                            }
-                        });
-                    }
-                });
-
-                // Build events array with grouped data
-                type Event = { date: Date, text: string, type: 'particular' | 'tutorial' };
-                const events: Event[] = [];
-
-                // Add particular days
-                particularByDay.forEach((data, dateStr) => {
-                    const d = new Date(dateStr);
-                    let text = `Dia ${d.getDate()} - ${data.hours}h`;
-                    if (data.hasNight) text += ' + nocturnidad';
-                    if (data.hasCoord) text += ' + coordinación';
-
-                    events.push({ date: d, text, type: 'particular' });
-                    totalHours += data.hours;
-                });
-
-                // Add tutorial days
-                tutorialByDay.forEach((data, dateStr) => {
-                    const d = new Date(dateStr);
-                    let text = `Dia ${d.getDate()} - ${data.text}`;
-                    if (data.hasNight) text += ' + nocturnidad';
-                    if (data.hasCoord) text += ' + coordinación';
-
-                    events.push({ date: d, text, type: 'tutorial' });
-                    totalTutorials += 1;
-                });
-
-                // Sort events by day
-                events.sort((a, b) => a.date.getTime() - b.date.getTime());
-
-                // Build string
-                events.forEach(e => {
-                    monthBody += `${e.text}\n`;
-                });
-
-                fullText += `${monthHeader}\n${monthBody}\nTotal: ${totalHours} horas / ${totalTutorials} tutoriales\nTotal noches: ${nightDates.size}\nTotal coordinaciones: ${coordDates.size}\n\n`;
-            });
-
-            setGeneratedText(fullText.trim());
+            setGeneratedText(fullText);
             setTextDialogOpen(true);
 
         } catch (e) {
