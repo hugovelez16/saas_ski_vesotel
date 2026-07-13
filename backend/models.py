@@ -165,3 +165,73 @@ class AuditLog(Base):
     admin_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     extra_data = Column(JSONB, default={})
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class SubscriptionScope(str, enum.Enum):
+    company = "company"  # Suscripción asignada a toda una empresa
+    user = "user"        # Suscripción asignada a un usuario individual
+
+class SubscriptionStatus(str, enum.Enum):
+    active = "active"
+    trial = "trial"
+    cancelled = "cancelled"
+    expired = "expired"
+
+class AppModule(Base):
+    """
+    Catálogo de módulos/funcionalidades disponibles en la plataforma.
+    Solo el Platform Admin puede crear/editar módulos.
+    """
+    __tablename__ = "app_modules"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    code_name = Column(String, unique=True, nullable=False)  # e.g. "worker_daily_report", "export_pdf"
+    name = Column(String, nullable=False)                    # Display name
+    description = Column(Text, nullable=True)
+    is_active = Column(Boolean, default=True)               # Is the module available to subscribe to?
+
+    # Which scopes can subscribe to this module?
+    # "both" means company OR user can subscribe.
+    # "company" means only company-level subs.
+    # "user" means only user-level subs.
+    target_scope = Column(String, default="both")  # "company" | "user" | "both"
+
+    # Future: pricing info (not used yet)
+    price_monthly = Column(Numeric(10, 2), nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    subscriptions = relationship("ModuleSubscription", back_populates="module")
+
+
+class ModuleSubscription(Base):
+    """
+    Suscripción activa a un módulo.
+    Puede ser de empresa (company_id != NULL, user_id == NULL)
+    o de usuario (user_id != NULL, company_id == NULL).
+    """
+    __tablename__ = "module_subscriptions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    module_id = Column(UUID(as_uuid=True), ForeignKey("app_modules.id"), nullable=False)
+
+    # Exactly ONE of these must be set (enforced at application level)
+    company_id = Column(UUID(as_uuid=True), ForeignKey("companies.id"), nullable=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+
+    scope = Column(Enum(SubscriptionScope), nullable=False)
+    status = Column(Enum(SubscriptionStatus), nullable=False, default=SubscriptionStatus.active)
+
+    # Optional expiry (NULL = never expires)
+    expires_at = Column(DateTime, nullable=True)
+
+    notes = Column(Text, nullable=True)  # Admin notes (e.g. "Regalo promo", "Pago Stripe #123")
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    module = relationship("AppModule", back_populates="subscriptions")
+    company = relationship("Company")
+    user = relationship("User")
+
