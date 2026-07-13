@@ -1,0 +1,110 @@
+"""seed_billing_and_reports_modules
+
+Revision ID: 0fb22f01dd7d
+Revises: 2314c15d1a0f
+Create Date: 2026-07-13 19:56:28.687691
+
+"""
+from typing import Sequence, Union
+
+from alembic import op
+from sqlalchemy import text
+import sqlalchemy as sa
+import uuid
+from datetime import datetime
+
+
+# revision identifiers, used by Alembic.
+revision: str = '0fb22f01dd7d'
+down_revision: Union[str, Sequence[str], None] = '2314c15d1a0f'
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+MODULES_TO_SEED = [
+    {
+        "code_name": "billing",
+        "name": "Facturación y Cobros",
+        "description": "Permite a los administradores de la empresa gestionar planes, facturas y métodos de pago.",
+        "target_scope": "company",
+        "is_active": True,
+        "seed_subs": True,
+        "legacy_default": True,
+    },
+    {
+        "code_name": "reports",
+        "name": "Informes y Estadísticas",
+        "description": "Acceso a reportes detallados de tiempos, rendimiento y facturas de la empresa.",
+        "target_scope": "both",
+        "is_active": True,
+        "seed_subs": True,
+        "legacy_default": True,
+    },
+]
+
+
+def upgrade() -> None:
+    conn = op.get_bind()
+    now = datetime.utcnow()
+
+    for mod_def in MODULES_TO_SEED:
+        # 1. Insertar el módulo en el catálogo
+        mod_id = str(uuid.uuid4())
+        conn.execute(text("""
+            INSERT INTO app_modules (id, code_name, name, description, is_active, target_scope, created_at, updated_at)
+            VALUES (:id, :code_name, :name, :description, :is_active, :target_scope, :now, :now)
+            ON CONFLICT (code_name) DO NOTHING
+        """), {
+            "id": mod_id, "code_name": mod_def["code_name"], "name": mod_def["name"],
+            "description": mod_def["description"], "is_active": mod_def["is_active"],
+            "target_scope": mod_def["target_scope"], "now": now
+        })
+
+        if not mod_def["seed_subs"]:
+            continue
+
+        # 2. Re-fetch real module_id (may already exist)
+        result = conn.execute(
+            text("SELECT id FROM app_modules WHERE code_name = :code_name"),
+            {"code_name": mod_def["code_name"]}
+        ).first()
+        if not result:
+            continue
+        real_mod_id = str(result[0])
+
+        # 3. Para cada empresa, leer su JSONB y crear sub si corresponde
+        companies = conn.execute(text("SELECT id, settings FROM companies")).fetchall()
+        for company in companies:
+            company_id = str(company[0])
+            settings = company[1] or {}
+            modules_dict = settings.get("modules", {})
+            features_dict = settings.get("features", {})
+
+            legacy_val = modules_dict.get(mod_def["code_name"])
+            feat_val = features_dict.get(mod_def["code_name"])
+            is_enabled = legacy_val if legacy_val is not None else (
+                feat_val if feat_val is not None else mod_def["legacy_default"]
+            )
+
+            if is_enabled:
+                conn.execute(text("""
+                    INSERT INTO module_subscriptions
+                        (id, module_id, company_id, user_id, scope, status, created_at, updated_at)
+                    VALUES (:id, :module_id, :company_id, NULL, 'company', 'active', :now, :now)
+                    ON CONFLICT DO NOTHING
+                """), {
+                    "id": str(uuid.uuid4()), "module_id": real_mod_id,
+                    "company_id": company_id, "now": now
+                })
+
+
+def downgrade() -> None:
+    conn = op.get_bind()
+    code_names = [m["code_name"] for m in MODULES_TO_SEED]
+    for code_name in code_names:
+        conn.execute(text("""
+            DELETE FROM module_subscriptions
+            WHERE module_id IN (SELECT id FROM app_modules WHERE code_name = :code_name)
+        """), {"code_name": code_name})
+    for code_name in code_names:
+        conn.execute(text("DELETE FROM app_modules WHERE code_name = :code_name"), {"code_name": code_name})
