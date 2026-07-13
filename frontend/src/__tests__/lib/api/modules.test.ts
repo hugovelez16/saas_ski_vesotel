@@ -16,10 +16,16 @@ describe('Modules API Client', () => {
         vi.clearAllMocks();
     });
 
-    it('getSubscriptions should GET /modules/subscriptions', async () => {
+    it('getSubscriptions should GET /modules/subscriptions with mapped snake_case parameters', async () => {
         (mockedApi.get as any).mockResolvedValue({ data: [] });
         await getSubscriptions({ moduleId: 'm-1' });
-        expect(mockedApi.get).toHaveBeenCalledWith('/modules/subscriptions', { params: { moduleId: 'm-1' } });
+        expect(mockedApi.get).toHaveBeenCalledWith('/modules/subscriptions', { params: { module_id: 'm-1' } });
+    });
+
+    it('getSubscriptions should GET /modules/subscriptions without arguments', async () => {
+        (mockedApi.get as any).mockResolvedValue({ data: [] });
+        await getSubscriptions();
+        expect(mockedApi.get).toHaveBeenCalledWith('/modules/subscriptions', { params: {} });
     });
 
     it('getModule should GET /modules/:id', async () => {

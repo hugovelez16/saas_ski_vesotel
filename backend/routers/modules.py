@@ -89,6 +89,7 @@ def get_module(
 def list_subscriptions(
     company_id: Optional[str] = None,
     user_id: Optional[str] = None,
+    module_id: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_verified_user)
 ):
@@ -116,7 +117,8 @@ def list_subscriptions(
         )\
         .filter(
             (models.ModuleSubscription.company_id == company_id) if company_id else True,
-            (models.ModuleSubscription.user_id == user_id) if user_id else True
+            (models.ModuleSubscription.user_id == user_id) if user_id else True,
+            (models.ModuleSubscription.module_id == module_id) if module_id else True
         ).order_by(models.ModuleSubscription.created_at.desc()).all()
 
     return subs

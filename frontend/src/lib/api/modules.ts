@@ -46,7 +46,12 @@ export const getSubscriptions = async (params?: {
     userId?: string;
     moduleId?: string;
 }): Promise<ModuleSubscription[]> => {
-    const response = await api.get<ModuleSubscription[]>("/modules/subscriptions", { params });
+    const queryParams: Record<string, string> = {};
+    if (params?.companyId) queryParams.company_id = params.companyId;
+    if (params?.userId) queryParams.user_id = params.userId;
+    if (params?.moduleId) queryParams.module_id = params.moduleId;
+    
+    const response = await api.get<ModuleSubscription[]>("/modules/subscriptions", { params: queryParams });
     return response.data;
 };
 
