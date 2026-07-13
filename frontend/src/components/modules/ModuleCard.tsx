@@ -23,7 +23,20 @@ const scopeIcons = {
 
 export function ModuleCard({ module, subscriptions, onAddSubscription, onCancelSubscription, onEditSubscription }: Props) {
     const Icon = scopeIcons[module.targetScope] ?? Layers;
-    const activeSubs = subscriptions.filter(s => s.status === "active" || s.status === "trial" || s.status === "expired" || s.status === "cancelled");
+    const registeredSubs = subscriptions.filter(s => s.status === "active" || s.status === "trial" || s.status === "expired" || s.status === "cancelled");
+
+    const getAssigneeName = (sub: ModuleSubscription) => {
+        if (sub.scope === "company") {
+            return sub.company?.name ?? (sub.companyId ? `Empresa: ${sub.companyId.substring(0, 8)}...` : "Empresa sin ID");
+        } else {
+            const u = sub.user;
+            if (!u) {
+                return sub.userId ? `Usuario: ${sub.userId.substring(0, 8)}...` : "Usuario sin ID";
+            }
+            const fullName = `${u.firstName || ""} ${u.lastName || ""}`.trim();
+            return fullName ? `${fullName} (${u.email})` : u.email;
+        }
+    };
 
     return (
         <Card className={`relative overflow-hidden transition-all duration-300 hover:shadow-md border-slate-200/80 ${!module.isActive ? "opacity-60 bg-slate-50/50" : "bg-white"}`}>
@@ -59,19 +72,17 @@ export function ModuleCard({ module, subscriptions, onAddSubscription, onCancelS
                 )}
 
                 {/* Lista de Suscripciones */}
-                {activeSubs.length > 0 && (
+                {registeredSubs.length > 0 && (
                     <div className="space-y-2.5 pt-2 border-t border-slate-100">
                         <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Suscripciones registradas</p>
                         <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                            {activeSubs.map(sub => (
+                            {registeredSubs.map(sub => (
                                 <div key={sub.id} className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/50 p-2.5 hover:bg-slate-50 transition-colors">
                                     <div className="flex flex-col gap-1 min-w-0 flex-1 mr-2">
                                         <div className="flex items-center gap-2">
                                             <SubscriptionBadge status={sub.status} />
-                                            <span className="text-xs font-semibold text-slate-700 truncate" title={sub.scope === "company" ? (sub.company?.name ?? sub.companyId ?? undefined) : (sub.user?.email ?? sub.userId ?? undefined)}>
-                                                {sub.scope === "company" 
-                                                    ? (sub.company?.name ?? `Empresa: ${sub.companyId?.substring(0,8)}...`)
-                                                    : (sub.user?.email ?? `Usuario: ${sub.userId?.substring(0,8)}...`)}
+                                            <span className="text-xs font-semibold text-slate-700 truncate" title={getAssigneeName(sub)}>
+                                                {getAssigneeName(sub)}
                                             </span>
                                         </div>
                                         <span className="text-[10px] text-slate-500 font-medium">

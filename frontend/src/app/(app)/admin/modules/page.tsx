@@ -19,6 +19,12 @@ import { PlusCircle, Package } from "lucide-react";
 
 export default function AdminModulesPage() {
     const queryClient = useQueryClient();
+
+    const parseDate = (dStr: string) => {
+        if (!dStr) return null;
+        const d = new Date(dStr);
+        return isNaN(d.getTime()) ? null : d.toISOString();
+    };
     const [showCreateModule, setShowCreateModule] = useState(false);
     const [showAddSubscription, setShowAddSubscription] = useState<AppModule | null>(null);
     const [showEditSubscription, setShowEditSubscription] = useState<ModuleSubscription | null>(null);
@@ -136,7 +142,11 @@ export default function AdminModulesPage() {
                             setNewSub({ scope: defaultScope, targetId: "", status: "active", expiresAt: "", notes: "" });
                             setShowAddSubscription(m);
                         }}
-                        onCancelSubscription={(sub) => cancelSubMutation.mutate(sub)}
+                        onCancelSubscription={(sub) => {
+                            if (window.confirm(`¿Estás seguro de que deseas cancelar la suscripción del módulo para ${sub.scope === "company" ? (sub.company?.name ?? "esta empresa") : (sub.user?.email ?? "este usuario")}?`)) {
+                                cancelSubMutation.mutate(sub);
+                            }
+                        }}
                         onEditSubscription={handleOpenEdit}
                     />
                 ))}
@@ -306,7 +316,7 @@ export default function AdminModulesPage() {
                                     companyId: newSub.scope === "company" ? newSub.targetId : undefined,
                                     userId: newSub.scope === "user" ? newSub.targetId : undefined,
                                     status: newSub.status,
-                                    expiresAt: newSub.expiresAt || undefined,
+                                    expiresAt: parseDate(newSub.expiresAt) || undefined,
                                     notes: newSub.notes || undefined,
                                 });
                             }}
@@ -379,7 +389,7 @@ export default function AdminModulesPage() {
                                     id: showEditSubscription.id,
                                     data: {
                                         status: editSubForm.status,
-                                        expiresAt: editSubForm.expiresAt ? new Date(editSubForm.expiresAt).toISOString() : null,
+                                        expiresAt: parseDate(editSubForm.expiresAt),
                                         notes: editSubForm.notes,
                                     }
                                 });
