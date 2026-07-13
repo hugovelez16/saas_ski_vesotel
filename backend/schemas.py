@@ -240,3 +240,72 @@ class PasswordResetRequest(CamelModel):
 class PasswordResetConfirm(CamelModel):
     token: str
     new_password: str
+
+
+# ─── Módulos y Suscripciones ───────────────────────────────────────────────
+
+class AppModuleCreate(CamelModel):
+    """Schema para crear un módulo en el catálogo (solo Platform Admin)."""
+    code_name: str
+    name: str
+    description: Optional[str] = None
+    is_active: bool = True
+    target_scope: str = "both"  # "company" | "user" | "both"
+    price_monthly: Optional[float] = None
+
+class AppModuleUpdate(CamelModel):
+    """Schema para actualizar un módulo del catálogo."""
+    name: Optional[str] = None
+    description: Optional[str] = None
+    is_active: Optional[bool] = None
+    target_scope: Optional[str] = None
+    price_monthly: Optional[float] = None
+
+class AppModuleResponse(CamelModel):
+    """Schema de respuesta de un módulo del catálogo."""
+    id: UUID
+    code_name: str
+    name: str
+    description: Optional[str] = None
+    is_active: bool
+    target_scope: str
+    price_monthly: Optional[float] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class ModuleSubscriptionCreate(CamelModel):
+    """Schema para crear una suscripción a un módulo."""
+    module_id: UUID = Field(..., alias="moduleId")
+    company_id: Optional[UUID] = Field(None, alias="companyId")
+    user_id: Optional[UUID] = Field(None, alias="userId")
+    scope: str  # "company" | "user"
+    status: str = "active"  # "active" | "trial" | "cancelled" | "expired"
+    expires_at: Optional[datetime] = Field(None, alias="expiresAt")
+    notes: Optional[str] = None
+
+class ModuleSubscriptionUpdate(CamelModel):
+    """Schema para actualizar el estado de una suscripción."""
+    status: Optional[str] = None
+    expires_at: Optional[datetime] = Field(None, alias="expiresAt")
+    notes: Optional[str] = None
+
+class ModuleSubscriptionResponse(CamelModel):
+    """Schema de respuesta de una suscripción."""
+    id: UUID
+    module_id: UUID = Field(..., alias="moduleId")
+    company_id: Optional[UUID] = Field(None, alias="companyId")
+    user_id: Optional[UUID] = Field(None, alias="userId")
+    scope: str
+    status: str
+    expires_at: Optional[datetime] = Field(None, alias="expiresAt")
+    notes: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    module: Optional[AppModuleResponse] = None
+
+    class Config:
+        from_attributes = True
+
