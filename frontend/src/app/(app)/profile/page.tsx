@@ -76,8 +76,6 @@ export default function ProfilePage() {
   const router = useRouter();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
-
   // Queries
 
 
@@ -87,25 +85,15 @@ export default function ProfilePage() {
     queryFn: getMyCompanies,
   });
 
-  // Auto-select company from active context or default
-  useEffect(() => {
-    if (user?.activeCompanyId) {
-      setSelectedCompanyId(user.activeCompanyId);
-    } else if (!selectedCompanyId && user?.defaultCompanyId) {
-      setSelectedCompanyId(user.defaultCompanyId);
-    } else if (!selectedCompanyId && myCompanies.length > 0) {
-      setSelectedCompanyId(myCompanies[0].id);
-    }
-  }, [user?.activeCompanyId, user?.defaultCompanyId, myCompanies.length]);
-
-  const currentCompany = myCompanies.find((c: Company) => c.id === selectedCompanyId);
+  const activeCompanyId = user?.activeCompanyId;
+  const currentCompany = myCompanies.find((c: Company) => c.id === activeCompanyId);
   const companySettings = currentCompany?.settings || {};
   const worklogDefinitions = currentCompany?.worklogDefinitions || {};
 
   const { data: rates, isLoading: isLoadingRates } = useQuery({
-    queryKey: ["rates", selectedCompanyId],
-    queryFn: () => getUserRates(selectedCompanyId),
-    enabled: !!selectedCompanyId,
+    queryKey: ["rates", activeCompanyId],
+    queryFn: () => getUserRates(activeCompanyId as string),
+    enabled: !!activeCompanyId,
   });
 
   // Forms
@@ -236,21 +224,21 @@ export default function ProfilePage() {
       return updateUserRates(companyId, user!.id, data);
     },
     onSuccess: () => {
-      toast({ title: "Rates updated" });
-      queryClient.invalidateQueries({ queryKey: ["rates", selectedCompanyId] });
+      toast({ title: "Tarifas actualizadas" });
+      queryClient.invalidateQueries({ queryKey: ["rates", activeCompanyId] });
     },
     onError: (error: any) => {
       toast({ 
-        title: "Failed to update rates", 
-        description: error.response?.data?.detail || "Make sure all values are correct.",
+        title: "Error al actualizar las tarifas", 
+        description: error.response?.data?.detail || "Asegúrate de que todos los valores son correctos.",
         variant: "destructive" 
       });
     },
   });
 
   function onRateSubmit(data: RateFormValues) {
-    if (!selectedCompanyId) {
-      toast({ title: "Please select a company first", variant: "destructive" });
+    if (!activeCompanyId) {
+      toast({ title: "Por favor, selecciona una empresa activa en el menú principal primero", variant: "destructive" });
       return;
     }
 
@@ -270,7 +258,7 @@ export default function ProfilePage() {
     }
 
     const payload = {
-      companyId: selectedCompanyId,
+      companyId: activeCompanyId,
       ...ratesConfig
     };
 
@@ -438,42 +426,29 @@ export default function ProfilePage() {
             {/* Rates Section */}
             <Card>
               <CardHeader>
-                <CardTitle>Company Rates</CardTitle>
-                <CardDescription>Manage your rates for each company.</CardDescription>
+                <CardTitle>Tarifas de la Empresa</CardTitle>
+                <CardDescription>Gestiona tus tarifas para la empresa activa.</CardDescription>
               </CardHeader>
               <CardContent>
-                {!user?.activeCompanyId && myCompanies.length > 1 && (
-                  <div className="mb-6">
-                    <Label className="mb-2 block">Select Company</Label>
-                    <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
-                      <SelectTrigger className="w-[280px]">
-                        <SelectValue placeholder="Select a company" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {myCompanies
-                          .map((company: Company) => (
-                            <SelectItem key={company.id} value={company.id}>
-                              {company.name}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
+                {!activeCompanyId ? (
+                  <div className="mb-6 text-center p-4 text-muted-foreground border rounded-md">
+                    Selecciona una empresa en el menú principal para configurar tus tarifas.
                   </div>
-                )}
+                ) : (
+                  <>
+                    {currentCompany && (
+                      <div className="mb-6 flex items-center gap-2 px-4 py-3 bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900 rounded-lg">
+                        <Building2 className="h-5 w-5 text-indigo-600" />
+                        <div>
+                          <p className="text-sm font-medium text-indigo-900 dark:text-indigo-100">Gestionando tarifas para:</p>
+                          <p className="text-lg font-bold text-indigo-700 dark:text-indigo-400">{currentCompany.name}</p>
+                        </div>
+                      </div>
+                    )}
 
-                {user?.activeCompanyId && currentCompany && (
-                  <div className="mb-6 flex items-center gap-2 px-4 py-3 bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900 rounded-lg">
-                    <Building2 className="h-5 w-5 text-indigo-600" />
-                    <div>
-                      <p className="text-sm font-medium text-indigo-900 dark:text-indigo-100">Gestionando tarifas para:</p>
-                      <p className="text-lg font-bold text-indigo-700 dark:text-indigo-400">{currentCompany.name}</p>
-                    </div>
-                  </div>
-                )}
-
-                <Form {...rateForm}>
-                  <form className="space-y-8" onSubmit={rateForm.handleSubmit(onRateSubmit)}>
-                    <div className="grid gap-4 md:grid-cols-2">
+                    <Form {...rateForm}>
+                      <form className="space-y-8" onSubmit={rateForm.handleSubmit(onRateSubmit)}>
+                        <div className="grid gap-4 md:grid-cols-2">
                       {Object.entries(worklogDefinitions || {}).map(([key, def]: [string, any]) => (
                         <FormField
                           key={key}
@@ -513,15 +488,15 @@ export default function ProfilePage() {
                     <div className="space-y-4 border-t pt-4">
                       <div className="flex items-center justify-between">
                         <div className="space-y-0.5">
-                          <h3 className="text-base font-semibold">Tax Settings</h3>
-                          <p className="text-sm text-muted-foreground">Configure deductions for your rates.</p>
+                          <h3 className="text-base font-semibold">Configuración de Impuestos</h3>
+                          <p className="text-sm text-muted-foreground">Configura las retenciones para tus tarifas.</p>
                         </div>
                         <FormField
                           control={rateForm.control}
                           name="isGross"
                           render={({ field }) => (
                             <FormItem className="flex flex-row items-center gap-2 space-y-0">
-                              <FormLabel className="text-base">Prices are Gross</FormLabel>
+                              <FormLabel className="text-base">Precios en Bruto</FormLabel>
                               <FormControl>
                                 <Switch
                                   checked={field.value}
@@ -540,19 +515,19 @@ export default function ProfilePage() {
                             name="deductionSs"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Social Security (SS) (%)</FormLabel>
+                                <FormLabel>Seguridad Social (SS) (%)</FormLabel>
                                 <FormControl>
                                   <Input
                                     type="number"
                                     step="0.0001"
-                                    placeholder={(currentCompany as any)?.taxConfig?.social_security ? `Default: ${((currentCompany as any).taxConfig.social_security * 100).toFixed(2)}` : "0"}
+                                    placeholder={(currentCompany as any)?.taxConfig?.social_security ? `Por Defecto: ${((currentCompany as any).taxConfig.social_security * 100).toFixed(2)}` : "0"}
                                     {...field}
                                     value={field.value ?? ""}
                                     onChange={e => field.onChange(e.target.value === "" ? undefined : Number(e.target.value))}
                                   />
                                 </FormControl>
                                 <FormDescription>
-                                  Leave empty to use Company Default ({(currentCompany as any)?.taxConfig?.social_security ? ((currentCompany as any).taxConfig.social_security * 100).toFixed(2) : 0}%)
+                                  Déjalo en blanco para usar el valor por defecto de la empresa ({(currentCompany as any)?.taxConfig?.social_security ? ((currentCompany as any).taxConfig.social_security * 100).toFixed(2) : 0}%)
                                 </FormDescription>
                                 <FormMessage />
                               </FormItem>
@@ -602,10 +577,12 @@ export default function ProfilePage() {
 
                     <Button disabled={rateMutation.isPending} type="submit">
                       {rateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      Save Rates
+                      Guardar Tarifas
                     </Button>
                   </form>
                 </Form>
+                  </>
+                )}
               </CardContent>
             </Card>
 
