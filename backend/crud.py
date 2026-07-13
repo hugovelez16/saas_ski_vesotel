@@ -756,3 +756,138 @@ def update_user(db: Session, user_id: Any, user: schemas.UserUpdate):
         db.commit()
         db.refresh(db_user)
     return db_user
+
+
+# ─── Module & Subscription CRUD ────────────────────────────────────────────
+
+from datetime import datetime as _dt
+
+def get_modules(db: Session, include_inactive: bool = False):
+    """Lista todos los módulos del catálogo."""
+    query = db.query(models.AppModule)
+    if not include_inactive:
+        query = query.filter(models.AppModule.is_active == True)
+    return query.order_by(models.AppModule.name).all()
+
+def get_module_by_id(db: Session, module_id: str):
+    return db.query(models.AppModule).filter(models.AppModule.id == module_id).first()
+
+def get_module_by_code(db: Session, code_name: str):
+    return db.query(models.AppModule).filter(models.AppModule.code_name == code_name).first()
+
+def create_module(db: Session, data: schemas.AppModuleCreate):
+    db_module = models.AppModule(**data.model_dump())
+    db.add(db_module)
+    db.commit()
+    db.refresh(db_module)
+    return db_module
+
+def update_module(db: Session, module_id: str, data: schemas.AppModuleUpdate):
+    db_module = db.query(models.AppModule).filter(models.AppModule.id == module_id).first()
+    if not db_module:
+        return None
+    update_data = data.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_module, key, value)
+    db.commit()
+    db.refresh(db_module)
+    return db_module
+
+def get_subscriptions(db: Session, company_id: str = None, user_id: str = None):
+    """Lista suscripciones filtrables por empresa o usuario."""
+    query = db.query(models.ModuleSubscription)
+    if company_id:
+        query = query.filter(models.ModuleSubscription.company_id == company_id)
+    if user_id:
+        query = query.filter(models.ModuleSubscription.user_id == user_id)
+    return query.order_by(models.ModuleSubscription.created_at.desc()).all()
+
+def create_subscription(db: Session, data: schemas.ModuleSubscriptionCreate):
+    """Crea una suscripción. Valida que solo company_id O user_id esté presente."""
+    if data.company_id and data.user_id:
+        raise ValueError("Una suscripción no puede tener company_id y user_id a la vez.")
+    if not data.company_id and not data.user_id:
+        raise ValueError("Una suscripción debe tener company_id o user_id.")
+
+    db_sub = models.ModuleSubscription(
+        module_id=data.module_id,
+        company_id=data.company_id,
+        user_id=data.user_id,
+        scope=models.SubscriptionScope(data.scope),
+        status=models.SubscriptionStatus(data.status),
+        expires_at=data.expires_at,
+        notes=data.notes
+    )
+    db.add(db_sub)
+    db.commit()
+    db.refresh(db_sub)
+    return db_sub
+
+def update_subscription(db: Session, sub_id: str, data: schemas.ModuleSubscriptionUpdate):
+    db_sub = db.query(models.ModuleSubscription).filter(models.ModuleSubscription.id == sub_id).first()
+    if not db_sub:
+        return None
+    update_data = data.model_dump(exclude_unset=True, by_alias=False)
+    for key, value in update_data.items():
+        if key == "status" and value:
+            setattr(db_sub, key, models.SubscriptionStatus(value))
+        else:
+            setattr(db_sub, key, value)
+    db.commit()
+    db.refresh(db_sub)
+    return db_sub
+
+def delete_subscription(db: Session, sub_id: str):
+    db_sub = db.query(models.ModuleSubscription).filter(models.ModuleSubscription.id == sub_id).first()
+    if db_sub:
+        db.delete(db_sub)
+        db.commit()
+    return db_sub
+
+def user_has_module(db: Session, user_id: str, company_id: str, code_name: str) -> bool:
+    """
+    Comprueba si un usuario tiene acceso a un módulo.
+    Prioridad:
+      1. ¿Tiene el usuario una suscripción activa (personal)?
+      2. ¿Tiene la empresa del usuario una suscripción activa?
+    Una suscripción está activa si status == "active" o "trial"
+    Y no ha expirado (expires_at is NULL o expires_at > now).
+    """
+    now = _dt.utcnow()
+    active_statuses = [models.SubscriptionStatus.active, models.SubscriptionStatus.trial]
+
+    # Buscar el módulo
+    module = get_module_by_code(db, code_name)
+    if not module or not module.is_active:
+        return False
+
+    # 1. Suscripción personal del usuario
+    user_sub = db.query(models.ModuleSubscription).filter(
+        models.ModuleSubscription.user_id == user_id,
+        models.ModuleSubscription.module_id == module.id,
+        models.ModuleSubscription.status.in_(active_statuses),
+        or_(
+            models.ModuleSubscription.expires_at.is_(None),
+            models.ModuleSubscription.expires_at > now
+        )
+    ).first()
+
+    if user_sub:
+        return True
+
+    # 2. Suscripción de empresa
+    if company_id:
+        company_sub = db.query(models.ModuleSubscription).filter(
+            models.ModuleSubscription.company_id == company_id,
+            models.ModuleSubscription.module_id == module.id,
+            models.ModuleSubscription.status.in_(active_statuses),
+            or_(
+                models.ModuleSubscription.expires_at.is_(None),
+                models.ModuleSubscription.expires_at > now
+            )
+        ).first()
+        if company_sub:
+            return True
+
+    return False
+
