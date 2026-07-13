@@ -14,7 +14,7 @@ export function useModules() {
     const { user } = useAuth();
 
     const { data: modules = [], isLoading } = useQuery<AppModule[]>({
-        queryKey: ["myModules", user?.id],
+        queryKey: ["myModules", user?.id, user?.activeCompanyId],
         queryFn: getMyModules,
         enabled: !!user,
         staleTime: 5 * 60 * 1000, // 5 minutos — los módulos cambian poco
