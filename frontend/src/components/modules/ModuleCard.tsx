@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Building2, User, Layers, Edit2 } from "lucide-react";
+import Link from "next/link";
 
 interface Props {
     module: AppModule;
@@ -49,7 +50,11 @@ export function ModuleCard({ module, subscriptions, onAddSubscription, onCancelS
                         <Icon className="h-5 w-5" />
                     </div>
                     <div>
-                        <CardTitle className="text-base font-bold text-slate-800">{module.name}</CardTitle>
+                        <Link href={`/admin/modules/${module.id}`}>
+                            <CardTitle className="text-base font-bold text-slate-800 hover:text-indigo-600 hover:underline transition-colors cursor-pointer">
+                                {module.name}
+                            </CardTitle>
+                        </Link>
                         <code className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200/60 mt-1 inline-block">
                             {module.codeName}
                         </code>
@@ -119,15 +124,26 @@ export function ModuleCard({ module, subscriptions, onAddSubscription, onCancelS
                     </div>
                 )}
 
-                <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full font-semibold border-indigo-100 hover:border-indigo-200 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50/30 transition-all duration-200 mt-2"
-                    disabled={!module.isActive}
-                    onClick={() => onAddSubscription(module)}
-                >
-                    + Añadir Suscripción
-                </Button>
+                <div className="flex gap-2.5 mt-2">
+                    <Link href={`/admin/modules/${module.id}`} className="flex-1">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full font-semibold border-slate-200 hover:border-slate-300 text-slate-600 hover:text-slate-700 hover:bg-slate-50 transition-all duration-200 text-xs py-1.5"
+                        >
+                            Ver Detalles
+                        </Button>
+                    </Link>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 font-semibold border-indigo-100 hover:border-indigo-200 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50/30 transition-all duration-200 text-xs py-1.5"
+                        disabled={!module.isActive}
+                        onClick={() => onAddSubscription(module)}
+                    >
+                        + Suscripción
+                    </Button>
+                </div>
             </CardContent>
         </Card>
     );
