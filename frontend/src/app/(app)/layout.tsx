@@ -71,6 +71,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             const activeCompany = myCompanies.find((c: any) => c.id === targetCompanyId);
             const settings = activeCompany?.settings || {};
             const isBillingEnabled = (settings.modules?.billing ?? settings.features?.billing) === true;
+            const isDailyReportEnabled = (settings.modules?.worker_daily_report ?? settings.features?.worker_daily_report ?? true) === true;
             
             // Modules check for Reports
             const reportsConfig = settings.modules?.reports ?? settings.features?.reports;
@@ -79,10 +80,14 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             const managerItems = [
                 { href: `/manager/dashboard${querySuffix}`, label: "Dashboard", icon: LayoutDashboard },
                 { href: `/manager/calendar${querySuffix}`, label: "Calendario", icon: Calendar },
-                { href: `/manager/daily-reports${querySuffix}`, label: "Parte Diario", icon: FileText },
-                { href: `/manager/users${querySuffix}`, label: "Usuarios", icon: Users },
-                { href: `/manager/shifts${querySuffix}`, label: "Turnos", icon: CalendarDays },
             ];
+            if (isDailyReportEnabled) {
+                managerItems.push({ href: `/manager/daily-reports${querySuffix}`, label: "Parte Diario", icon: FileText });
+            }
+            managerItems.push(
+                { href: `/manager/users${querySuffix}`, label: "Usuarios", icon: Users },
+                { href: `/manager/shifts${querySuffix}`, label: "Turnos", icon: CalendarDays }
+            );
             if (isBillingEnabled) {
                 managerItems.push({ href: `/manager/billing${querySuffix}`, label: "Facturación", icon: Banknote });
             }
@@ -148,6 +153,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             const activeCompany = myCompanies.find((c: any) => c.id === targetCompanyId);
             const settings = activeCompany?.settings || {};
             const isBillingEnabled = (settings.modules?.billing ?? settings.features?.billing) === true;
+            const isDailyReportEnabled = (settings.modules?.worker_daily_report ?? settings.features?.worker_daily_report ?? true) === true;
             
             // Reports check
             const reportsConfig = settings.modules?.reports ?? settings.features?.reports;
@@ -156,10 +162,14 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             const managerItems = [
                 { href: `/manager/dashboard${querySuffix}`, label: "Dashboard", icon: LayoutDashboard },
                 { href: `/manager/calendar${querySuffix}`, label: "Calendario", icon: Calendar },
-                { href: `/manager/daily-reports${querySuffix}`, label: "Parte Diario", icon: FileText },
-                { href: `/manager/users${querySuffix}`, label: "Usuarios", icon: Users },
-                { href: `/manager/shifts${querySuffix}`, label: "Turnos", icon: CalendarDays },
             ];
+            if (isDailyReportEnabled) {
+                managerItems.push({ href: `/manager/daily-reports${querySuffix}`, label: "Parte Diario", icon: FileText });
+            }
+            managerItems.push(
+                { href: `/manager/users${querySuffix}`, label: "Usuarios", icon: Users },
+                { href: `/manager/shifts${querySuffix}`, label: "Turnos", icon: CalendarDays }
+            );
             if (isBillingEnabled) {
                 managerItems.push({ href: `/manager/billing${querySuffix}`, label: "Facturación", icon: Banknote });
             }
