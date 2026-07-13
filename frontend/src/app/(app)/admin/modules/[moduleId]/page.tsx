@@ -4,6 +4,9 @@ import { use, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getModule, updateModule } from "@/lib/api/modules";
+import { getSubscriptions, createSubscription, updateSubscription } from "@/lib/api/modules";
+import { getCompanies } from "@/lib/api/companies";
+import { getUsers } from "@/lib/api/users";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,21 +15,16 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { ArrowLeft, Package, Sparkles, ShieldAlert } from "lucide-react";
+import { ArrowLeft, Package, Sparkles, Edit2, X, ShieldAlert, PlusCircle } from "lucide-react";
 import { SubscriptionBadge } from "@/components/modules/SubscriptionBadge";
+import { ModuleSubscription } from "@/lib/types";
 
 export default function ModuleDetailPage({ params }: { params: Promise<{ moduleId: string }> }) {
     const { moduleId } = use(params);
     const router = useRouter();
     const queryClient = useQueryClient();
 
-    // ─── Queries ────────────────────────────────────────────────────────────
-    const { data: module, isLoading: loadingModule } = useQuery({
-        queryKey: ["modules", moduleId],
-        queryFn: () => getModule(moduleId),
-    });
-
-    // ─── Module Form State ──────────────────────────────────────────────────
+    // ─── Form States ────────────────────────────────────────────────────────
     const [moduleForm, setModuleForm] = useState({
         name: "",
         description: "",
@@ -35,6 +33,46 @@ export default function ModuleDetailPage({ params }: { params: Promise<{ moduleI
         isActive: true,
     });
 
+    const [showSubForm, setShowSubForm] = useState(false);
+    const [editingSub, setEditingSub] = useState<ModuleSubscription | null>(null);
+
+    const [subForm, setSubForm] = useState({
+        scope: "company" as "company" | "user",
+        targetId: "",
+        status: "active",
+        expiresAt: "",
+        notes: "",
+    });
+
+    // Helper para fechas seguras
+    const parseDate = (dStr: string) => {
+        if (!dStr) return null;
+        const d = new Date(dStr);
+        return isNaN(d.getTime()) ? null : d.toISOString();
+    };
+
+    // ─── Queries ────────────────────────────────────────────────────────────
+    const { data: module, isLoading: loadingModule } = useQuery({
+        queryKey: ["modules", moduleId],
+        queryFn: () => getModule(moduleId),
+    });
+
+    const { data: subscriptions = [] } = useQuery({
+        queryKey: ["subscriptions", { moduleId }],
+        queryFn: () => getSubscriptions({ moduleId }),
+    });
+
+    const { data: companies = [] } = useQuery({
+        queryKey: ["companies"],
+        queryFn: getCompanies,
+    });
+
+    const { data: users = [] } = useQuery({
+        queryKey: ["users"],
+        queryFn: getUsers,
+    });
+
+    // Sincronizar formulario de módulo
     useEffect(() => {
         if (module) {
             // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -48,7 +86,7 @@ export default function ModuleDetailPage({ params }: { params: Promise<{ moduleI
         }
     }, [module]);
 
-    // ─── Module Mutation ────────────────────────────────────────────────────
+    // ─── Mutations ──────────────────────────────────────────────────────────
     const updateModuleMutation = useMutation({
         mutationFn: (data: Parameters<typeof updateModule>[1]) => updateModule(moduleId, data),
         onSuccess: () => {
@@ -58,6 +96,39 @@ export default function ModuleDetailPage({ params }: { params: Promise<{ moduleI
         onError: () => toast.error("Error al actualizar el módulo."),
     });
 
+    const addSubMutation = useMutation({
+        mutationFn: createSubscription,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["subscriptions", { moduleId }] });
+            setShowSubForm(false);
+            setSubForm({ scope: "company", targetId: "", status: "active", expiresAt: "", notes: "" });
+            toast.success("Suscripción registrada correctamente.");
+        },
+        onError: () => toast.error("Error al registrar la suscripción."),
+    });
+
+    const editSubMutation = useMutation({
+        mutationFn: ({ id, data }: { id: string; data: Parameters<typeof updateSubscription>[1] }) => updateSubscription(id, data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["subscriptions", { moduleId }] });
+            setEditingSub(null);
+            setShowSubForm(false);
+            setSubForm({ scope: "company", targetId: "", status: "active", expiresAt: "", notes: "" });
+            toast.success("Suscripción actualizada correctamente.");
+        },
+        onError: () => toast.error("Error al actualizar la suscripción."),
+    });
+
+    const cancelSubMutation = useMutation({
+        mutationFn: (id: string) => updateSubscription(id, { status: "cancelled" }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["subscriptions", { moduleId }] });
+            toast.success("Suscripción cancelada.");
+        },
+        onError: () => toast.error("Error al cancelar la suscripción."),
+    });
+
+    // ─── Handlers ───────────────────────────────────────────────────────────
     const handleSaveModule = () => {
         updateModuleMutation.mutate({
             name: moduleForm.name,
@@ -66,6 +137,59 @@ export default function ModuleDetailPage({ params }: { params: Promise<{ moduleI
             priceMonthly: moduleForm.priceMonthly !== "" ? Number(moduleForm.priceMonthly) : null,
             isActive: moduleForm.isActive,
         });
+    };
+
+    const handleSaveSubscription = () => {
+        if (!subForm.targetId && !editingSub) {
+            toast.error("Por favor, selecciona una entidad para la suscripción.");
+            return;
+        }
+
+        if (editingSub) {
+            editSubMutation.mutate({
+                id: editingSub.id,
+                data: {
+                    status: subForm.status,
+                    expiresAt: parseDate(subForm.expiresAt),
+                    notes: subForm.notes,
+                },
+            });
+        } else {
+            addSubMutation.mutate({
+                moduleId,
+                scope: subForm.scope,
+                companyId: subForm.scope === "company" ? subForm.targetId : undefined,
+                userId: subForm.scope === "user" ? subForm.targetId : undefined,
+                status: subForm.status,
+                expiresAt: subForm.expiresAt ? new Date(subForm.expiresAt).toISOString() : undefined,
+                notes: subForm.notes || undefined,
+            });
+        }
+    };
+
+    const handleOpenEditSub = (sub: ModuleSubscription) => {
+        setEditingSub(sub);
+        setSubForm({
+            scope: sub.scope,
+            targetId: sub.scope === "company" ? (sub.companyId || "") : (sub.userId || ""),
+            status: sub.status,
+            expiresAt: sub.expiresAt ? sub.expiresAt.substring(0, 10) : "",
+            notes: sub.notes || "",
+        });
+        setShowSubForm(true);
+    };
+
+    const getAssigneeName = (sub: ModuleSubscription) => {
+        if (sub.scope === "company") {
+            return sub.company?.name ?? (sub.companyId ? `Empresa: ${sub.companyId.substring(0, 8)}...` : "Empresa sin ID");
+        } else {
+            const u = sub.user;
+            if (!u) {
+                return sub.userId ? `Usuario: ${sub.userId.substring(0, 8)}...` : "Usuario sin ID";
+            }
+            const fullName = `${u.firstName || ""} ${u.lastName || ""}`.trim();
+            return fullName ? `${fullName} (${u.email})` : u.email;
+        }
     };
 
     if (loadingModule) {
@@ -200,15 +324,225 @@ export default function ModuleDetailPage({ params }: { params: Promise<{ moduleI
                     </Card>
                 </div>
 
-                {/* Columna Derecha Placeholder */}
-                <div id="sub-section-target" className="lg:col-span-7 space-y-6">
+                {/* Columna Derecha: Gestión de Suscripciones */}
+                <div className="lg:col-span-7 space-y-6">
                     <Card className="border-slate-200/80 bg-white">
-                        <CardContent className="py-8 text-center text-slate-400 text-sm">
-                            Inicializando sección de suscripciones...
-                            {/* Use unused imports to avoid compilation warnings/errors */}
-                            <span className="hidden">
-                                <SubscriptionBadge status="active" />
-                            </span>
+                        <CardHeader className="flex flex-row justify-between items-center pb-4 border-b border-slate-100">
+                            <div>
+                                <CardTitle className="text-base font-bold text-slate-800">Suscripciones Asignadas</CardTitle>
+                                <CardDescription className="text-xs">Control de accesos y licencias activas para este módulo</CardDescription>
+                            </div>
+                            <Button
+                                size="sm"
+                                disabled={!module.isActive || showSubForm}
+                                onClick={() => {
+                                    const defaultScope = moduleForm.targetScope === "both" ? "company" : moduleForm.targetScope;
+                                    setEditingSub(null);
+                                    setSubForm({ scope: defaultScope, targetId: "", status: "active", expiresAt: "", notes: "" });
+                                    setShowSubForm(true);
+                                }}
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs"
+                            >
+                                <PlusCircle className="mr-1.5 h-3.5 w-3.5" />
+                                Añadir Suscripción
+                            </Button>
+                        </CardHeader>
+                        <CardContent className="space-y-6 pt-5">
+                            {/* Formulario Inline Colapsable */}
+                            {showSubForm && (
+                                <div className="border border-slate-100 rounded-xl p-4 bg-slate-50/50 space-y-4 transition-all duration-300">
+                                    <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+                                        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                                            {editingSub ? "Editar Suscripción" : "Nueva Suscripción"}
+                                        </h3>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => setShowSubForm(false)}
+                                            className="h-6 w-6 text-slate-400 hover:text-slate-600 rounded-md"
+                                        >
+                                            <X className="h-4.5 w-4.5" />
+                                        </Button>
+                                    </div>
+                                    <div className="space-y-3">
+                                        {/* Scope Select - Solo si el alcance general es 'both' y es creación */}
+                                        {moduleForm.targetScope === "both" && !editingSub && (
+                                            <div className="space-y-1">
+                                                <Label className="text-xs font-bold text-slate-600">Tipo de suscripción</Label>
+                                                <Select
+                                                    value={subForm.scope}
+                                                    onValueChange={(v: "company" | "user") => setSubForm(p => ({ ...p, scope: v, targetId: "" }))}
+                                                >
+                                                    <SelectTrigger className="bg-white"><SelectValue /></SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="company">Empresa</SelectItem>
+                                                        <SelectItem value="user">Usuario</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        )}
+
+                                        {/* Target Entity Selector - Solo en creación, en edición se muestra lectura */}
+                                        {!editingSub ? (
+                                            <div className="space-y-1">
+                                                <Label className="text-xs font-bold text-slate-600">
+                                                    {subForm.scope === "company" ? "Seleccionar Empresa" : "Seleccionar Usuario"}
+                                                </Label>
+                                                {subForm.scope === "company" ? (
+                                                    <Select
+                                                        value={subForm.targetId}
+                                                        onValueChange={v => setSubForm(p => ({ ...p, targetId: v }))}
+                                                    >
+                                                        <SelectTrigger className="bg-white focus:ring-indigo-500">
+                                                            <SelectValue placeholder="Selecciona una empresa..." />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            {companies.map(c => (
+                                                                <SelectItem key={c.id} value={c.id}>
+                                                                    {c.name} {c.fiscalId ? `(${c.fiscalId})` : ""}
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                ) : (
+                                                    <Select
+                                                        value={subForm.targetId}
+                                                        onValueChange={v => setSubForm(p => ({ ...p, targetId: v }))}
+                                                    >
+                                                        <SelectTrigger className="bg-white focus:ring-indigo-500">
+                                                            <SelectValue placeholder="Selecciona un usuario..." />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            {users.map(u => (
+                                                                <SelectItem key={u.id} value={u.id}>
+                                                                    {u.firstName || u.lastName ? `${u.firstName || ""} ${u.lastName || ""}`.trim() : u.email} ({u.email})
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <div>
+                                                <Label className="text-xs font-bold text-slate-500">Asignada a</Label>
+                                                <div className="text-xs font-semibold border border-slate-200/60 rounded-lg px-3 py-2 bg-slate-100 text-slate-600 mt-1">
+                                                    {getAssigneeName(editingSub)}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-1">
+                                                <Label className="text-xs font-bold text-slate-600">Estado</Label>
+                                                <Select
+                                                    value={subForm.status}
+                                                    onValueChange={v => setSubForm(p => ({ ...p, status: v }))}
+                                                >
+                                                    <SelectTrigger className="bg-white"><SelectValue /></SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="active">Activo</SelectItem>
+                                                        <SelectItem value="trial">Trial</SelectItem>
+                                                        {editingSub && <SelectItem value="expired">Expirado</SelectItem>}
+                                                        {editingSub && <SelectItem value="cancelled">Cancelado</SelectItem>}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <Label className="text-xs font-bold text-slate-600">Fecha expiración (opcional)</Label>
+                                                <Input
+                                                    type="date"
+                                                    value={subForm.expiresAt}
+                                                    onChange={e => setSubForm(p => ({ ...p, expiresAt: e.target.value }))}
+                                                    className="bg-white focus-visible:ring-indigo-500"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <Label className="text-xs font-bold text-slate-600">Notas (opcional)</Label>
+                                            <Input
+                                                placeholder="Notas de soporte, Stripe ID, etc..."
+                                                value={subForm.notes}
+                                                onChange={e => setSubForm(p => ({ ...p, notes: e.target.value }))}
+                                                className="bg-white focus-visible:ring-indigo-500"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => setShowSubForm(false)}
+                                            className="text-xs"
+                                        >
+                                            Cancelar
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            onClick={handleSaveSubscription}
+                                            disabled={addSubMutation.isPending || editSubMutation.isPending}
+                                            className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs"
+                                        >
+                                            {addSubMutation.isPending || editSubMutation.isPending ? "Guardando..." : "Guardar Suscripción"}
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Listado de Suscripciones */}
+                            <div className="space-y-2.5">
+                                {subscriptions.length > 0 ? (
+                                    subscriptions.map(sub => (
+                                        <div key={sub.id} className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/40 p-3 hover:bg-slate-50 transition-colors">
+                                            <div className="flex flex-col gap-1 min-w-0 flex-1 mr-2">
+                                                <div className="flex items-center gap-2">
+                                                    <SubscriptionBadge status={sub.status} />
+                                                    <span className="text-xs font-semibold text-slate-700 truncate" title={getAssigneeName(sub)}>
+                                                        {getAssigneeName(sub)}
+                                                    </span>
+                                                </div>
+                                                <span className="text-[10px] text-slate-500 font-medium">
+                                                    {sub.expiresAt
+                                                        ? `Expira: ${new Date(sub.expiresAt).toLocaleDateString("es-ES")}`
+                                                        : "Permanente"}
+                                                    {sub.notes && ` • ${sub.notes}`}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-1.5 shrink-0">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    disabled={showSubForm}
+                                                    onClick={() => handleOpenEditSub(sub)}
+                                                    className="h-7 w-7 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50/60 rounded-md"
+                                                    title="Editar suscripción"
+                                                >
+                                                    <Edit2 className="h-3.5 w-3.5" />
+                                                </Button>
+                                                {sub.status !== "cancelled" && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => {
+                                                            const name = getAssigneeName(sub);
+                                                            if (window.confirm(`¿Estás seguro de que deseas cancelar la suscripción de "${name}"?`)) {
+                                                                cancelSubMutation.mutate(sub.id);
+                                                            }
+                                                        }}
+                                                        className="h-7 text-[11px] font-semibold text-rose-500 hover:text-rose-600 hover:bg-rose-50/60 rounded-md"
+                                                    >
+                                                        Cancelar
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="text-center py-8 text-slate-400 text-sm">
+                                        No hay suscripciones registradas para este módulo.
+                                    </div>
+                                )}
+                            </div>
                         </CardContent>
                     </Card>
                 </div>
