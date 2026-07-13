@@ -844,7 +844,7 @@ def delete_subscription(db: Session, sub_id: str):
         db.commit()
     return db_sub
 
-def user_has_module(db: Session, user_id: str, company_id: str, code_name: str) -> bool:
+def user_has_module(db: Session, user_id: str, company_id: Optional[str], code_name: str) -> bool:
     """
     Comprueba si un usuario tiene acceso a un módulo.
     Prioridad:

@@ -68,7 +68,8 @@ def require_module(code_name: str):
             return
 
         user_id = str(current_user.id)
-        company_id = str(getattr(current_user, "active_company_id", None) or "")
+        active_cid = getattr(current_user, "active_company_id", None)
+        company_id = str(active_cid) if active_cid else None
 
         has_access = crud.user_has_module(db, user_id, company_id, code_name)
         if not has_access:
