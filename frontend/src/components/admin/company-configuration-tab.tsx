@@ -7,7 +7,8 @@ import { updateCompany } from "@/lib/api/companies";
 import { Loader2 } from "lucide-react";
 import { WorklogDefinitionBuilder } from "@/components/admin/worklog-definition-builder";
 import { TaxConfigBuilder } from "@/components/admin/tax-config-builder";
-import { FeatureFlagsBuilder } from "@/components/admin/feature-flags-builder";
+import { Button } from "@/components/ui/button";
+import { CompanyModulesList } from "@/components/modules/CompanyModulesList";
 import { BusinessLogicBuilder } from "@/components/admin/business-logic-builder";
 import { WorkerUXBuilder } from "@/components/admin/worker-ux-builder";
 import { useAuth } from "@/context/AuthContext";
@@ -36,15 +37,17 @@ export function CompanyConfigurationTab({ company }: CompanyConfigurationTabProp
         <div className="space-y-8">
             {/* 1. Módulos y Funcionalidades */}
             <Card className="border-indigo-100 shadow-sm">
-                <CardHeader className="bg-indigo-50/30">
-                    <CardTitle className="text-xl">Módulos del Sistema</CardTitle>
-                    <CardDescription>Activa o desactiva módulos premium y funcionalidades globales para esta empresa.</CardDescription>
+                <CardHeader className="bg-indigo-50/30 flex flex-row items-center justify-between">
+                    <div>
+                        <CardTitle className="text-xl">Módulos Activos</CardTitle>
+                        <CardDescription>Módulos y funcionalidades activos para esta empresa.</CardDescription>
+                    </div>
+                    <Button variant="outline" size="sm" asChild>
+                        <a href="/admin/modules">Gestionar Módulos →</a>
+                    </Button>
                 </CardHeader>
                 <CardContent className="pt-6">
-                    <FeatureFlagsBuilder
-                        initialValue={company.settings || {}}
-                        onSave={(val) => mutation.mutate({ settings: val })}
-                    />
+                    <CompanyModulesList companyId={company.id} />
                 </CardContent>
             </Card>
 
