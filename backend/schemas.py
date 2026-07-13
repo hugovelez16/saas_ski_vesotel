@@ -273,8 +273,6 @@ class AppModuleResponse(CamelModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
 
 class ModuleSubscriptionCreate(CamelModel):
     """Schema para crear una suscripción a un módulo."""
@@ -306,6 +304,4 @@ class ModuleSubscriptionResponse(CamelModel):
     updated_at: datetime
     module: Optional[AppModuleResponse] = None
 
-    class Config:
-        from_attributes = True
 
