@@ -30,42 +30,6 @@ MODULES_TO_SEED = [
         "seed_subs": True,
         "legacy_default": True,
     },
-    {
-        "code_name": "reports",
-        "name": "Módulo de Informes",
-        "description": "Habilita la sección de informes para exportación de partes y PDF.",
-        "target_scope": "company",
-        "is_active": True,
-        "seed_subs": True,
-        "legacy_default": True,
-    },
-    {
-        "code_name": "billing",
-        "name": "Facturación y Economía",
-        "description": "Habilita la pestaña de facturación, gestión de precios y reportes financieros.",
-        "target_scope": "company",
-        "is_active": True,
-        "seed_subs": False,
-        "legacy_default": False,
-    },
-    {
-        "code_name": "client_database",
-        "name": "Base de Datos de Clientes",
-        "description": "Activa la gestión avanzada de clientes en lugar de entrada de texto libre.",
-        "target_scope": "both",
-        "is_active": True,
-        "seed_subs": False,
-        "legacy_default": False,
-    },
-    {
-        "code_name": "advanced_reports",
-        "name": "Informes Avanzados",
-        "description": "Activa métricas y visualizaciones avanzadas para la dirección.",
-        "target_scope": "both",
-        "is_active": True,
-        "seed_subs": False,
-        "legacy_default": False,
-    },
 ]
 
 
