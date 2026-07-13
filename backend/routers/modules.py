@@ -95,7 +95,11 @@ def list_subscriptions(
         user_id = None  # Managers cannot filter by user_id
 
     subs = db.query(models.ModuleSubscription)\
-        .options(joinedload(models.ModuleSubscription.module))\
+        .options(
+            joinedload(models.ModuleSubscription.module),
+            joinedload(models.ModuleSubscription.company),
+            joinedload(models.ModuleSubscription.user)
+        )\
         .filter(
             (models.ModuleSubscription.company_id == company_id) if company_id else True,
             (models.ModuleSubscription.user_id == user_id) if user_id else True

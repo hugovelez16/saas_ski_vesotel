@@ -303,5 +303,7 @@ class ModuleSubscriptionResponse(CamelModel):
     created_at: datetime
     updated_at: datetime
     module: Optional[AppModuleResponse] = None
+    company: Optional[CompanyResponse] = None
+    user: Optional[UserResponse] = None
 
 
