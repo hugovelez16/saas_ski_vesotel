@@ -98,6 +98,7 @@ export default function AdminModulesPage() {
                         subscriptions={subsForModule(module.id)}
                         onAddSubscription={(m) => setShowAddSubscription(m)}
                         onCancelSubscription={(sub) => cancelSubMutation.mutate(sub)}
+                        onEditSubscription={(sub) => toast.info(`Editar suscripción: ${sub.id}`)}
                     />
                 ))}
             </div>
