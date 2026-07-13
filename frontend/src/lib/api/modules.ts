@@ -19,7 +19,7 @@ export const createModule = async (data: {
     description?: string;
     isActive?: boolean;
     targetScope?: string;
-    priceMonthly?: number;
+    priceMonthly?: number | null;
 }): Promise<AppModule> => {
     const response = await api.post<AppModule>("/modules", data);
     return response.data;
@@ -30,7 +30,7 @@ export const updateModule = async (moduleId: string, data: {
     description?: string;
     isActive?: boolean;
     targetScope?: string;
-    priceMonthly?: number;
+    priceMonthly?: number | null;
 }): Promise<AppModule> => {
     const response = await api.put<AppModule>(`/modules/${moduleId}`, data);
     return response.data;

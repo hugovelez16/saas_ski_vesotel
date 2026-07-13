@@ -4,9 +4,6 @@ import { use, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getModule, updateModule } from "@/lib/api/modules";
-import { getSubscriptions, createSubscription, updateSubscription } from "@/lib/api/modules";
-import { getCompanies } from "@/lib/api/companies";
-import { getUsers } from "@/lib/api/users";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,11 +11,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ArrowLeft, Package, Sparkles, Building2, User, Layers, Calendar, Edit2, Check, X, ShieldAlert } from "lucide-react";
+import { ArrowLeft, Package, Sparkles, ShieldAlert } from "lucide-react";
 import { SubscriptionBadge } from "@/components/modules/SubscriptionBadge";
-import { ModuleSubscription } from "@/lib/types";
 
 export default function ModuleDetailPage({ params }: { params: Promise<{ moduleId: string }> }) {
     const { moduleId } = use(params);
@@ -42,6 +37,7 @@ export default function ModuleDetailPage({ params }: { params: Promise<{ moduleI
 
     useEffect(() => {
         if (module) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setModuleForm({
                 name: module.name,
                 description: module.description || "",
@@ -54,7 +50,7 @@ export default function ModuleDetailPage({ params }: { params: Promise<{ moduleI
 
     // ─── Module Mutation ────────────────────────────────────────────────────
     const updateModuleMutation = useMutation({
-        mutationFn: (data: any) => updateModule(moduleId, data),
+        mutationFn: (data: Parameters<typeof updateModule>[1]) => updateModule(moduleId, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["modules"] });
             toast.success("Módulo actualizado correctamente.");
@@ -89,12 +85,7 @@ export default function ModuleDetailPage({ params }: { params: Promise<{ moduleI
         );
     }
 
-    const scopeIcons = {
-        company: Building2,
-        user: User,
-        both: Layers,
-    };
-    const ScopeIcon = scopeIcons[moduleForm.targetScope] ?? Layers;
+
 
     return (
         <div className="space-y-6 w-full py-2">
@@ -163,7 +154,7 @@ export default function ModuleDetailPage({ params }: { params: Promise<{ moduleI
                                     <Label className="text-xs font-bold text-slate-600">Alcance</Label>
                                     <Select
                                         value={moduleForm.targetScope}
-                                        onValueChange={(v: any) => setModuleForm(p => ({ ...p, targetScope: v }))}
+                                        onValueChange={(v: "company" | "user" | "both") => setModuleForm(p => ({ ...p, targetScope: v }))}
                                     >
                                         <SelectTrigger className="bg-slate-50/50">
                                             <SelectValue />
