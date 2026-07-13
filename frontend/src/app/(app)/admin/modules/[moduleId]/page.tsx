@@ -161,7 +161,7 @@ export default function ModuleDetailPage({ params }: { params: Promise<{ moduleI
                 companyId: subForm.scope === "company" ? subForm.targetId : undefined,
                 userId: subForm.scope === "user" ? subForm.targetId : undefined,
                 status: subForm.status,
-                expiresAt: subForm.expiresAt ? new Date(subForm.expiresAt).toISOString() : undefined,
+                expiresAt: parseDate(subForm.expiresAt) || undefined,
                 notes: subForm.notes || undefined,
             });
         }
