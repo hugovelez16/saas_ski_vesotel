@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getModules, getSubscriptions, createModule, updateModule, createSubscription, updateSubscription, deleteSubscription } from "@/lib/api/modules";
+import { getModules, getSubscriptions, createModule, createSubscription, updateSubscription } from "@/lib/api/modules";
 import { AppModule, ModuleSubscription } from "@/lib/types";
 import { ModuleCard } from "@/components/modules/ModuleCard";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,7 @@ export default function AdminModulesPage() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["modules"] });
             setShowCreateModule(false);
+            setNewModule({ codeName: "", name: "", description: "", targetScope: "both" });
             toast.success("Módulo creado correctamente.");
         },
         onError: (e: any) => toast.error(e?.response?.data?.detail ?? "Error al crear el módulo."),
@@ -55,6 +56,7 @@ export default function AdminModulesPage() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
             setShowAddSubscription(null);
+            setNewSub({ scope: "company", targetId: "", status: "active", expiresAt: "", notes: "" });
             toast.success("Suscripción creada correctamente.");
         },
         onError: (e: any) => toast.error(e?.response?.data?.detail ?? "Error al crear la suscripción."),
@@ -100,7 +102,12 @@ export default function AdminModulesPage() {
             </div>
 
             {/* Create Module Dialog */}
-            <Dialog open={showCreateModule} onOpenChange={setShowCreateModule}>
+            <Dialog open={showCreateModule} onOpenChange={(open) => {
+                setShowCreateModule(open);
+                if (!open) {
+                    setNewModule({ codeName: "", name: "", description: "", targetScope: "both" });
+                }
+            }}>
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Nuevo Módulo</DialogTitle>
@@ -157,7 +164,12 @@ export default function AdminModulesPage() {
             </Dialog>
 
             {/* Add Subscription Dialog */}
-            <Dialog open={!!showAddSubscription} onOpenChange={() => setShowAddSubscription(null)}>
+            <Dialog open={!!showAddSubscription} onOpenChange={(open) => {
+                if (!open) {
+                    setShowAddSubscription(null);
+                    setNewSub({ scope: "company", targetId: "", status: "active", expiresAt: "", notes: "" });
+                }
+            }}>
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Añadir Suscripción — {showAddSubscription?.name}</DialogTitle>

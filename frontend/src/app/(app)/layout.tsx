@@ -24,7 +24,6 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         { href: "/admin/companies", label: "Gestión de Empresas", icon: Building2 },
         { href: "/admin/daily-reports", label: "Parte Diario", icon: FileText },
         { href: "/admin/users", label: "Usuarios", icon: Users },
-        { href: "/reports", label: "Informes Globales", icon: FileText },
         { href: "/admin/modules", label: "Módulos", icon: Package },
     ];
 
