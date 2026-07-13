@@ -7,7 +7,7 @@ import { getMyCompanies } from "@/lib/api/companies";
 import { CompanyResponse } from "@/lib/types";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, FileText, Calendar, Settings, Users, Building2, Bell, Banknote, CalendarDays } from "lucide-react";
+import { LayoutDashboard, FileText, Calendar, Settings, Users, Building2, Bell, Banknote, CalendarDays, Package } from "lucide-react";
 import { Sidebar, SidebarProvider } from "@/components/ui/sidebar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,8 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         { href: "/admin/companies", label: "Gestión de Empresas", icon: Building2 },
         { href: "/admin/daily-reports", label: "Parte Diario", icon: FileText },
         { href: "/admin/users", label: "Usuarios", icon: Users },
+        { href: "/reports", label: "Informes Globales", icon: FileText },
+        { href: "/admin/modules", label: "Módulos", icon: Package },
     ];
 
     const workerNavItems = [
