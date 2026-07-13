@@ -69,6 +69,20 @@ def update_module(
     return updated
 
 
+@router.get("/{module_id}", response_model=schemas.AppModuleResponse)
+def get_module(
+    module_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_verified_user)
+):
+    """Obtiene un módulo específico por su ID (Platform Admin)."""
+    _require_admin(current_user)
+    module = crud.get_module_by_id(db, module_id)
+    if not module:
+        raise HTTPException(status_code=404, detail="Módulo no encontrado.")
+    return module
+
+
 # ─── Suscripciones ──────────────────────────────────────────────────────────
 
 @router.get("/subscriptions", response_model=List[schemas.ModuleSubscriptionResponse])
