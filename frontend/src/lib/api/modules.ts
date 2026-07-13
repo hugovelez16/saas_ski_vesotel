@@ -36,13 +36,20 @@ export const updateModule = async (moduleId: string, data: {
     return response.data;
 };
 
+export const getModule = async (moduleId: string): Promise<AppModule> => {
+    const response = await api.get<AppModule>(`/modules/${moduleId}`);
+    return response.data;
+};
+
 export const getSubscriptions = async (params?: {
     companyId?: string;
     userId?: string;
+    moduleId?: string;
 }): Promise<ModuleSubscription[]> => {
     const response = await api.get<ModuleSubscription[]>("/modules/subscriptions", { params });
     return response.data;
 };
+
 
 export const createSubscription = async (data: {
     moduleId: string;
