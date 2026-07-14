@@ -46,7 +46,6 @@ const MODULE_SIDEBAR_REGISTRY: Record<string, {
 
 function AppLayoutContent({ children }: { children: React.ReactNode }) {
     const { user, loading, logout } = useAuth();
-    const { modules = [], isLoading: loadingModules } = useModules();
     const router = useRouter();
     const pathname = usePathname();
     const searchParams = useSearchParams();
@@ -81,6 +80,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     // Determine target company ID for links (persist current -> session context -> default to first)
     const targetCompanyId = currentCompanyId || user?.activeCompanyId || (myCompanies.length > 0 ? myCompanies[0].id : null);
     const querySuffix = targetCompanyId ? `?companyId=${targetCompanyId}` : "";
+    const { modules = [], isLoading: loadingModules } = useModules(targetCompanyId || undefined);
 
     // Build Nav Groups
     const navGroups: { label?: string; items: SidebarNavItem[] }[] = [];
