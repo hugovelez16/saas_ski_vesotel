@@ -112,8 +112,8 @@ def read_work_logs(
         # Check if user is manager/admin of the requested company OR if they are checking availability for a user in their managed company
         is_supervisor_request = False
         
-        if target_company_id:
-             if is_manager_of_company(db, current_user, UUID(target_company_id) if isinstance(target_company_id, str) else target_company_id):
+        if company_id:
+             if is_manager_of_company(db, current_user, UUID(company_id) if isinstance(company_id, str) else company_id):
                  is_supervisor_request = True
                  target_user_id = None # See all logs for this company
                  if user_id:
@@ -122,12 +122,12 @@ def read_work_logs(
                  # Check if the company has worker_daily_report enabled and the user is an active member
                  membership = db.query(models.CompanyMember).filter(
                      models.CompanyMember.user_id == current_user.id,
-                     models.CompanyMember.company_id == target_company_id,
+                     models.CompanyMember.company_id == company_id,
                      models.CompanyMember.is_active == True
                  ).first()
                  
                  if membership:
-                     if crud.user_has_module(db, str(current_user.id), str(target_company_id), "worker_daily_report"):
+                     if crud.user_has_module(db, str(current_user.id), str(company_id), "worker_daily_report"):
                          is_supervisor_request = True
                          target_user_id = None
                          if user_id:
