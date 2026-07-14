@@ -4,8 +4,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import AppLayout from '@/app/(app)/layout';
 import { useAuth } from '@/context/AuthContext';
 import { useModules } from '@/hooks/useModules';
-import { useQuery } from '@tanstack/react-query';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useQuery, UseQueryResult } from '@tanstack/react-query';
+import { useSearchParams } from 'next/navigation';
 
 // Mock Next.js Navigation
 vi.mock('next/navigation', () => {
@@ -16,7 +16,7 @@ vi.mock('next/navigation', () => {
             push: pushMock,
         })),
         useSearchParams: vi.fn(() => ({
-            get: vi.fn((key) => null),
+            get: vi.fn(() => null),
         })),
     };
 });
@@ -42,17 +42,17 @@ vi.mock('@/components/auth/scope-selection-dialog', () => ({
 }));
 
 vi.mock('@/components/ui/button', () => ({
-    Button: ({ children, ...props }: any) => <button {...props}>{children}</button>,
+    Button: ({ children, ...props }: React.ComponentPropsWithoutRef<'button'>) => <button {...props}>{children}</button>,
 }));
 
 // Mock Framer Motion to avoid any animation related issues in jsdom
 vi.mock('framer-motion', () => ({
     motion: {
-        span: ({ children, ...props }: any) => <span {...props}>{children}</span>,
-        div: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-        aside: ({ children, ...props }: any) => <aside {...props}>{children}</aside>,
+        span: ({ children, ...props }: React.ComponentPropsWithoutRef<'span'>) => <span {...props}>{children}</span>,
+        div: ({ children, ...props }: React.ComponentPropsWithoutRef<'div'>) => <div {...props}>{children}</div>,
+        aside: ({ children, ...props }: React.ComponentPropsWithoutRef<'aside'>) => <aside {...props}>{children}</aside>,
     },
-    AnimatePresence: ({ children }: any) => <>{children}</>,
+    AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
 describe('AppLayout Sidebar Integration for Platform Admin', () => {
@@ -65,15 +65,15 @@ describe('AppLayout Sidebar Integration for Platform Admin', () => {
         vi.clearAllMocks();
         
         // Mock getMyCompanies query response
-        (useQuery as any).mockReturnValue({
+        vi.mocked(useQuery).mockReturnValue({
             data: mockCompanies,
             isLoading: false,
-        });
+        } as unknown as UseQueryResult<unknown, unknown>);
     });
 
     it('Scenario 1: Platform Admin with NO company context should see Administration items', () => {
         // Mock user as Platform Admin with no active role or company
-        (useAuth as any).mockReturnValue({
+        vi.mocked(useAuth).mockReturnValue({
             user: {
                 id: 'admin-id',
                 email: 'hugo@vesotel.com',
@@ -84,14 +84,14 @@ describe('AppLayout Sidebar Integration for Platform Admin', () => {
             },
             loading: false,
             logout: vi.fn(),
-        });
+        } as unknown as ReturnType<typeof useAuth>);
 
         // Mock empty modules since no company context
-        (useModules as any).mockReturnValue({
+        vi.mocked(useModules).mockReturnValue({
             modules: [],
             isLoading: false,
             hasModule: () => true,
-        });
+        } as unknown as ReturnType<typeof useModules>);
 
         render(
             <AppLayout>
@@ -108,12 +108,12 @@ describe('AppLayout Sidebar Integration for Platform Admin', () => {
 
     it('Scenario 2: Platform Admin in Querkus context (only billing active) should NOT see Parte Diario or Informes', () => {
         // Mock Search Params returning Querkus ID
-        (useSearchParams as any).mockReturnValue({
+        vi.mocked(useSearchParams).mockReturnValue({
             get: vi.fn((key) => key === 'companyId' ? 'querkus-id' : null),
-        });
+        } as unknown as ReturnType<typeof useSearchParams>);
 
         // Mock user switched context to manager in Querkus
-        (useAuth as any).mockReturnValue({
+        vi.mocked(useAuth).mockReturnValue({
             user: {
                 id: 'admin-id',
                 email: 'hugo@vesotel.com',
@@ -124,16 +124,16 @@ describe('AppLayout Sidebar Integration for Platform Admin', () => {
             },
             loading: false,
             logout: vi.fn(),
-        });
+        } as unknown as ReturnType<typeof useAuth>);
 
         // Mock Querkus modules: billing only
-        (useModules as any).mockReturnValue({
+        vi.mocked(useModules).mockReturnValue({
             modules: [
                 { id: 'm-billing', codeName: 'billing', name: 'Facturación', isActive: true }
             ],
             isLoading: false,
             hasModule: (code: string) => code === 'billing',
-        });
+        } as unknown as ReturnType<typeof useModules>);
 
         render(
             <AppLayout>
@@ -160,12 +160,12 @@ describe('AppLayout Sidebar Integration for Platform Admin', () => {
 
     it('Scenario 3: Platform Admin in Surf in Comporta context (all modules active) should see everything', () => {
         // Mock Search Params returning Surf in Comporta ID
-        (useSearchParams as any).mockReturnValue({
+        vi.mocked(useSearchParams).mockReturnValue({
             get: vi.fn((key) => key === 'companyId' ? 'surf-id' : null),
-        });
+        } as unknown as ReturnType<typeof useSearchParams>);
 
         // Mock user switched context to manager in Surf in Comporta
-        (useAuth as any).mockReturnValue({
+        vi.mocked(useAuth).mockReturnValue({
             user: {
                 id: 'admin-id',
                 email: 'hugo@vesotel.com',
@@ -176,10 +176,10 @@ describe('AppLayout Sidebar Integration for Platform Admin', () => {
             },
             loading: false,
             logout: vi.fn(),
-        });
+        } as unknown as ReturnType<typeof useAuth>);
 
         // Mock Surf in Comporta modules: all active
-        (useModules as any).mockReturnValue({
+        vi.mocked(useModules).mockReturnValue({
             modules: [
                 { id: 'm-billing', codeName: 'billing', name: 'Facturación', isActive: true },
                 { id: 'm-reports', codeName: 'reports', name: 'Informes', isActive: true },
@@ -187,7 +187,7 @@ describe('AppLayout Sidebar Integration for Platform Admin', () => {
             ],
             isLoading: false,
             hasModule: () => true,
-        });
+        } as unknown as ReturnType<typeof useModules>);
 
         render(
             <AppLayout>
