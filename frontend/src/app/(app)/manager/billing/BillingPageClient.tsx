@@ -51,8 +51,10 @@ export default function ManagerBillingPage() {
         enabled: !!selectedCompanyId,
     });
 
-    const worklogDefs: Record<string, { unit: string; label: string }> =
-        company?.worklogDefinitions ?? {};
+    const worklogDefs = useMemo(
+        () => (company?.worklogDefinitions ?? {}) as Record<string, { unit: string; label: string }>,
+        [company]
+    );
 
     // 3. Aggregate Data — dynamic grouping by log.type
     const billingData: DynamicBillingRow[] = useMemo(() => {
