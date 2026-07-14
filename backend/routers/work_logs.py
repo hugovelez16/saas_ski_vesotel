@@ -139,7 +139,7 @@ def read_work_logs(
             # Regular user or Manager accessing outside their scope
             # Check generically if manager manages this user via any company
             if user_id and str(user_id) != str(current_user.id):
-                 if check_manager_access(db, current_user, user_id):
+                 if check_manager_access(db, current_user, str(user_id)):
                      final_user_id = user_id
                  else:
                      raise HTTPException(status_code=403, detail="Not authorized to view other users' logs")

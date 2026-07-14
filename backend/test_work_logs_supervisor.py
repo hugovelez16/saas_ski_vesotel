@@ -1,10 +1,8 @@
 import unittest
 import uuid
 from datetime import date
-from sqlalchemy.orm import Session
 from database import SessionLocal
 import models
-import crud
 from routers.work_logs import read_work_logs
 
 class TestWorkLogsSupervisorLogic(unittest.TestCase):
