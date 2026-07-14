@@ -255,3 +255,24 @@ export interface ModuleSubscription {
     company?: Company;
     user?: User;
 }
+
+// ─── Dynamic Billing ──────────────────────────────────────────────────────
+
+export interface WorklogTypeSummary {
+    typeKey: string;
+    label: string;
+    unit: "hours" | "days" | string;
+    quantity: number;   // horas o días, según unit
+    netAmount: number;
+    grossAmount: number;
+}
+
+export interface DynamicBillingRow {
+    userId: string;
+    userName: string;
+    userEmail: string;
+    byType: Record<string, WorklogTypeSummary>;  // typeKey → summary
+    totalNet: number;
+    totalGross: number;
+    logs: WorkLog[];
+}
