@@ -7,7 +7,7 @@ import {
     DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { BillingRow } from "./billing-table";
+import { DynamicBillingRow } from "@/lib/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/data-table";
 import { useRouter } from "next/navigation";
 import { User, Calculator } from "lucide-react";
@@ -15,10 +15,11 @@ import { User, Calculator } from "lucide-react";
 interface BillingBreakdownDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    row: BillingRow | null;
+    row: DynamicBillingRow | null;
+    worklogDefs: Record<string, { unit: string; label: string }>;
 }
 
-export function BillingBreakdownDialog({ open, onOpenChange, row }: BillingBreakdownDialogProps) {
+export function BillingBreakdownDialog({ open, onOpenChange, row, worklogDefs }: BillingBreakdownDialogProps) {
     const router = useRouter();
 
     if (!row) return null;
@@ -56,35 +57,28 @@ export function BillingBreakdownDialog({ open, onOpenChange, row }: BillingBreak
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                <TableRow>
-                                    <TableCell className="font-medium">Horas Particulares</TableCell>
-                                    <TableCell className="text-right">{row.particularHours.toFixed(2)} h</TableCell>
-                                    <TableCell className="text-right">{formatCurrency(row.particularGrossAmount || row.particularAmount)}</TableCell>
-                                </TableRow>
-                                {row.tutorialDays > 0 && (
-                                    <TableRow>
-                                        <TableCell className="font-medium">Días Tutoriales</TableCell>
-                                        <TableCell className="text-right">{row.tutorialDays} días</TableCell>
-                                        <TableCell className="text-right">{formatCurrency(row.tutorialGrossAmount || row.tutorialAmount)}</TableCell>
-                                    </TableRow>
-                                )}
-                                {row.coordinatedDays > 0 && (
-                                    <TableRow>
-                                        <TableCell className="font-medium">Coordinación</TableCell>
-                                        <TableCell className="text-right">{row.coordinatedDays} días</TableCell>
-                                        <TableCell className="text-right">{formatCurrency(row.coordinatedGrossAmount || row.coordinatedAmount)}</TableCell>
-                                    </TableRow>
-                                )}
-                                {row.nightShifts > 0 && (
-                                    <TableRow>
-                                        <TableCell className="font-medium">Nocturnidad</TableCell>
-                                        <TableCell className="text-right">{row.nightShifts} turnos</TableCell>
-                                        <TableCell className="text-right">{formatCurrency(row.nightGrossAmount || row.nightAmount)}</TableCell>
-                                    </TableRow>
-                                )}
+                                {Object.entries(row.byType)
+                                    .filter(([, summary]) => summary.quantity > 0 || summary.grossAmount > 0)
+                                    .map(([typeKey, summary]) => {
+                                        const def = worklogDefs[typeKey];
+                                        const unit = def?.unit ?? 'hours';
+                                        const label = def?.label ?? typeKey;
+                                        const qtyStr = unit === 'hours'
+                                            ? `${summary.quantity.toFixed(2)} h`
+                                            : `${summary.quantity} días`;
+                                        const amount = summary.grossAmount || summary.netAmount;
+                                        return (
+                                            <TableRow key={typeKey}>
+                                                <TableCell className="font-medium">{label}</TableCell>
+                                                <TableCell className="text-right">{qtyStr}</TableCell>
+                                                <TableCell className="text-right">{formatCurrency(amount)}</TableCell>
+                                            </TableRow>
+                                        );
+                                    })
+                                }
                                 <TableRow className="bg-muted/50 font-bold">
                                     <TableCell colSpan={2}>Total</TableCell>
-                                    <TableCell className="text-right text-emerald-600">{formatCurrency(row.totalGrossAmount || row.totalAmount)}</TableCell>
+                                    <TableCell className="text-right text-emerald-600">{formatCurrency(row.totalGross || row.totalNet)}</TableCell>
                                 </TableRow>
                             </TableBody>
                         </Table>

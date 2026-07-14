@@ -172,7 +172,7 @@ def delete_subscription(
 
 @router.get("/me", response_model=List[schemas.AppModuleResponse])
 def get_my_modules(
-    company_id: Optional[str] = None,
+    company_id: Optional[UUID] = None,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_verified_user)
 ):
@@ -220,19 +220,23 @@ def get_my_modules(
     else:
         user_id = str(current_user.id)
         # Subs activas del usuario o de su empresa
+        filters = [
+            models.ModuleSubscription.status.in_(active_statuses),
+            or_(
+                models.ModuleSubscription.expires_at.is_(None),
+                models.ModuleSubscription.expires_at > now
+            )
+        ]
+        
+        user_or_company_filters = [models.ModuleSubscription.user_id == user_id]
+        if effective_company_id:
+            user_or_company_filters.append(models.ModuleSubscription.company_id == effective_company_id)
+            
+        filters.append(or_(*user_or_company_filters))
+
         subs = db.query(models.ModuleSubscription)\
             .options(joinedload(models.ModuleSubscription.module))\
-            .filter(
-                models.ModuleSubscription.status.in_(active_statuses),
-                or_(
-                    models.ModuleSubscription.expires_at.is_(None),
-                    models.ModuleSubscription.expires_at > now
-                ),
-                or_(
-                    models.ModuleSubscription.user_id == user_id,
-                    models.ModuleSubscription.company_id == effective_company_id if effective_company_id else False
-                )
-            ).all()
+            .filter(*filters).all()
 
     # Devolver los módulos únicos (puede haber sub personal + sub empresa del mismo módulo)
     seen = set()

@@ -96,7 +96,6 @@ export function BillingTable({ data, worklogDefs, isLoading }: BillingTableProps
                 searchPlaceholder="Buscar por nombre..."
             />
 
-            {/* @ts-ignore — BillingBreakdownDialog row/worklogDefs types updated in Task 4 */}
             <BillingBreakdownDialog
                 open={!!selectedRow}
                 onOpenChange={(open) => !open && setSelectedRow(null)}
