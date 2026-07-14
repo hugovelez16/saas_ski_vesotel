@@ -4,14 +4,14 @@ import { useState, useMemo } from "react";
 import { DateRange } from "react-day-picker";
 import { startOfMonth, endOfMonth, format, eachDayOfInterval, parseISO, addMonths, subMonths } from "date-fns";
 import { DateRangeFilter } from "@/components/manager/date-range-filter";
-import { BillingTable, BillingRow } from "@/components/manager/billing-table";
+import { BillingTable } from "@/components/manager/billing-table";
 import { getWorkLogs } from "@/lib/api/work-logs";
-import { getCompanyMembers, getCompanyRates } from "@/lib/api/companies";
+import { getCompanyMembers } from "@/lib/api/companies";
 import { useQuery } from "@tanstack/react-query";
-import { WorkLog, UserCompanyRate } from "@/lib/types";
+import { WorkLog, DynamicBillingRow } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Download, Coins, Wallet, Clock, Sparkles } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, Coins, Wallet, FileText } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { mkConfig, generateCsv, download } from "export-to-csv";
 
@@ -51,173 +51,104 @@ export default function ManagerBillingPage() {
         enabled: !!selectedCompanyId,
     });
 
-    // 3. Aggregate Data
-    const billingData: BillingRow[] = useMemo(() => {
-        if (!workLogs || workLogs.length === 0) return [];
+    const worklogDefs: Record<string, { unit: string; label: string }> =
+        company?.worklogDefinitions ?? {};
 
-        // Helper interface for intermediate aggregation
-        interface UserAgg {
-            row: BillingRow;
-            tutorialDates: Set<string>;
-            coordinatedDates: Set<string>;
-            nightDates: Set<string>;
-        }
+    // 3. Aggregate Data — dynamic grouping by log.type
+    const billingData: DynamicBillingRow[] = useMemo(() => {
+        if (!workLogs.length) return [];
 
-        const userMap = new Map<string, UserAgg>();
+        type DateSetMap = Record<string, Set<string>>;
+        const userMap = new Map<string, { row: DynamicBillingRow; dateSets: DateSetMap }>();
 
-        // Initialize with active members
+        // Inicializar con miembros activos
         members.forEach((member: any) => {
-            if (member.user) {
-                userMap.set(member.user_id, {
-                    row: {
-                        userId: member.user_id,
-                        userName: `${member.user.firstName || ''} ${member.user.lastName || ''}`.trim() || member.user.email,
-                        userEmail: member.user.email,
-                        particularHours: 0,
-                        particularAmount: 0,
-                        particularGrossAmount: 0, // NEW
-                        tutorialDays: 0,
-                        tutorialAmount: 0,
-                        tutorialGrossAmount: 0, // NEW
-                        coordinatedDays: 0,
-                        coordinatedAmount: 0,
-                        coordinatedGrossAmount: 0, // NEW
-                        nightShifts: 0,
-                        nightAmount: 0,
-                        nightGrossAmount: 0, // NEW
-                        totalAmount: 0,
-                        totalGrossAmount: 0, // NEW
-                        logs: []
-                    },
-                    tutorialDates: new Set(),
-                    coordinatedDates: new Set(),
-                    nightDates: new Set(),
-                });
-            }
+            if (!member.user) return;
+            userMap.set(member.user_id, {
+                row: {
+                    userId: member.user_id,
+                    userName: `${member.user.firstName || ''} ${member.user.lastName || ''}`.trim() || member.user.email,
+                    userEmail: member.user.email,
+                    byType: {},
+                    totalNet: 0,
+                    totalGross: 0,
+                    logs: [],
+                },
+                dateSets: {},
+            });
         });
 
-        // Process logs
         workLogs.forEach((log: WorkLog) => {
             let agg = userMap.get(log.userId);
-
-            // If user not in members list
             if (!agg) {
                 agg = {
                     row: {
                         userId: log.userId,
-                        userName: "Unknown User",
-                        userEmail: "",
-                        particularHours: 0,
-                        particularAmount: 0,
-                        particularGrossAmount: 0, // NEW
-                        tutorialDays: 0,
-                        tutorialAmount: 0,
-                        tutorialGrossAmount: 0, // NEW
-                        coordinatedDays: 0,
-                        coordinatedAmount: 0,
-                        coordinatedGrossAmount: 0, // NEW
-                        nightShifts: 0,
-                        nightAmount: 0,
-                        nightGrossAmount: 0, // NEW
-                        totalAmount: 0,
-                        totalGrossAmount: 0, // NEW
-                        logs: []
+                        userName: 'Unknown',
+                        userEmail: '',
+                        byType: {},
+                        totalNet: 0,
+                        totalGross: 0,
+                        logs: [],
                     },
-                    tutorialDates: new Set(),
-                    coordinatedDates: new Set(),
-                    nightDates: new Set(),
+                    dateSets: {},
                 };
                 userMap.set(log.userId, agg);
             }
 
-            const logDate = log.startDate;
-
             agg.row.logs.push(log);
 
-            // Calculations
-            const amount = log.netAmount !== undefined ? Number(log.netAmount) : (Number(log.amount) || 0);
+            const def = worklogDefs[log.type];
+            const unit = def?.unit ?? 'hours';
+            const label = def?.label ?? log.type;
 
-            if (log.type === 'particular') {
-                agg.row.particularHours += log.duration !== undefined ? Number(log.duration) : (Number(log.durationHours) || 0);
-                agg.row.particularAmount += amount;
-                agg.row.particularGrossAmount += Number(log.grossAmount) || 0;
-            } else if (log.type === 'tutorial') {
-                agg.row.tutorialAmount += amount; // Attribute total amount to tutorial
-                agg.row.tutorialGrossAmount += Number(log.grossAmount) || 0;
-                if (log.startDate && log.endDate) {
-                    try {
-                        const range = eachDayOfInterval({
-                            start: parseISO(log.startDate),
-                            end: parseISO(log.endDate)
-                        });
-                        range.forEach(d => agg.tutorialDates.add(format(d, 'yyyy-MM-dd')));
-                    } catch (e) {
-                        console.error("Error parsing dates for tutorial log", log);
-                    }
-                }
+            if (!agg.row.byType[log.type]) {
+                agg.row.byType[log.type] = { typeKey: log.type, label, unit, quantity: 0, netAmount: 0, grossAmount: 0 };
+            }
+            if (unit === 'days' && !agg.dateSets[log.type]) {
+                agg.dateSets[log.type] = new Set<string>();
             }
 
-            const hasCoordination = log.hasCoordination || log.extraData?.opciones?.has_coordination || log.extraData?.opciones?.coordination;
-            if (hasCoordination) {
-                if (logDate) {
-                    agg.coordinatedDates.add(logDate);
-                }
-                // We don't have separate coord amount
+            const summary = agg.row.byType[log.type];
+
+            if (unit === 'hours') {
+                summary.quantity += Number(log.duration ?? 0);
+            } else {
+                // Acumular días únicos en el intervalo
+                try {
+                    eachDayOfInterval({ start: parseISO(log.startDate), end: parseISO(log.endDate) })
+                        .forEach(d => agg!.dateSets[log.type].add(format(d, 'yyyy-MM-dd')));
+                } catch {}
             }
 
-            const hasNight = log.hasNight || log.extraData?.opciones?.has_night || log.extraData?.opciones?.night;
-            if (hasNight) {
-                if (log.type === 'tutorial' && log.startDate && log.endDate) {
-                    // For tutorials: count all days except the last one (days - 1)
-                    try {
-                        const range = eachDayOfInterval({
-                            start: parseISO(log.startDate),
-                            end: parseISO(log.endDate)
-                        });
-                        // Add all days except the last one
-                        range.slice(0, -1).forEach(d => agg.nightDates.add(format(d, 'yyyy-MM-dd')));
-                    } catch (e) {
-                        console.error("Error parsing dates for night calculation", log);
-                    }
-                } else if (log.type === 'particular' && logDate) {
-                    // For particular shifts: count the single day
-                    agg.nightDates.add(logDate);
-                }
-            }
-
-            agg.row.totalAmount += amount;
-            agg.row.totalGrossAmount += Number(log.grossAmount) || 0;
+            summary.netAmount += Number(log.netAmount ?? 0);
+            summary.grossAmount += Number(log.grossAmount ?? 0);
+            agg.row.totalNet += Number(log.netAmount ?? 0);
+            agg.row.totalGross += Number(log.grossAmount ?? 0);
         });
 
-        // Convert back to rows
-        return Array.from(userMap.values()).map(agg => ({
-            ...agg.row,
-            tutorialDays: agg.tutorialDates.size,
-            coordinatedDays: agg.coordinatedDates.size,
-            nightShifts: agg.nightDates.size,
-        }));
-    }, [workLogs, members]);
+        // Resolver cantidades para tipos "days"
+        return Array.from(userMap.values()).map(({ row, dateSets }) => {
+            Object.keys(dateSets).forEach(typeKey => {
+                if (row.byType[typeKey]) {
+                    row.byType[typeKey].quantity = dateSets[typeKey].size;
+                }
+            });
+            return row;
+        });
+    }, [workLogs, members, worklogDefs]);
 
     const summaryStats = useMemo(() => {
         let totalGross = 0;
         let totalNet = 0;
-        let totalHours = 0;
-        let totalTutorials = 0;
 
         billingData.forEach(row => {
-            totalGross += row.totalGrossAmount || row.totalAmount;
-            totalNet += row.totalAmount;
-            totalHours += row.particularHours;
-            totalTutorials += row.tutorialDays;
+            totalGross += row.totalGross;
+            totalNet += row.totalNet;
         });
 
-        return {
-            totalGross,
-            totalNet,
-            totalHours,
-            totalTutorials
-        };
-    }, [billingData]);
+        return { totalGross, totalNet, totalLogs: workLogs.length };
+    }, [billingData, workLogs.length]);
 
     const handleExportCsv = () => {
         if (billingData.length === 0) return;
@@ -228,16 +159,22 @@ export default function ManagerBillingPage() {
             filename: `Facturacion_Mensual_${date?.from ? format(date.from, 'MM-yyyy') : 'report'}`
         });
 
-        const exportData = billingData.map(row => ({
-            Nombre: row.userName,
-            Email: row.userEmail,
-            'Horas Particulares': row.particularHours.toFixed(2),
-            'Días Tutoriales': row.tutorialDays,
-            'Días Coordinados': row.coordinatedDays,
-            Nocturnidades: row.nightShifts,
-            'Total Bruto (€)': (row.totalGrossAmount || row.totalAmount).toFixed(2),
-            'Total Neto (€)': row.totalAmount.toFixed(2)
-        }));
+        const exportData = billingData.map(row => {
+            const base: Record<string, any> = {
+                Nombre: row.userName,
+                Email: row.userEmail,
+            };
+            Object.entries(worklogDefs).forEach(([typeKey, def]) => {
+                const summary = row.byType[typeKey];
+                const unitLabel = def.unit === 'hours' ? 'h' : 'días';
+                base[`${def.label} (${unitLabel})`] = summary
+                    ? summary.quantity.toFixed(def.unit === 'hours' ? 2 : 0)
+                    : '0';
+            });
+            base['Total Bruto (€)'] = (row.totalGross || row.totalNet).toFixed(2);
+            base['Total Neto (€)'] = row.totalNet.toFixed(2);
+            return base;
+        });
 
         const csv = generateCsv(csvConfig)(exportData);
         download(csvConfig)(csv);
@@ -307,7 +244,7 @@ export default function ManagerBillingPage() {
             {selectedCompanyId && (
                 <>
                     {/* KPI Cards Grid */}
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                         <Card className="border-emerald-100 dark:border-emerald-950 shadow-sm hover:shadow-md transition-all duration-300">
                             <CardHeader className="flex flex-row items-center justify-between pb-2">
                                 <CardTitle className="text-sm font-medium text-slate-500 uppercase tracking-wider">Coste Bruto (Empresa)</CardTitle>
@@ -336,35 +273,23 @@ export default function ManagerBillingPage() {
 
                         <Card className="border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-all duration-300">
                             <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                <CardTitle className="text-sm font-medium text-slate-500 uppercase tracking-wider">Horas Particulares</CardTitle>
-                                <Clock className="h-5 w-5 text-slate-600 dark:text-slate-400" />
+                                <CardTitle className="text-sm font-medium text-slate-500 uppercase tracking-wider">Total Registros</CardTitle>
+                                <FileText className="h-5 w-5 text-slate-600 dark:text-slate-400" />
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-                                    {summaryStats.totalHours.toFixed(2)} h
+                                    {summaryStats.totalLogs}
                                 </div>
-                                <p className="text-xs text-muted-foreground mt-1">Tiempo de servicio regular</p>
-                            </CardContent>
-                        </Card>
-
-                        <Card className="border-amber-100 dark:border-amber-950 shadow-sm hover:shadow-md transition-all duration-300">
-                            <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                <CardTitle className="text-sm font-medium text-slate-500 uppercase tracking-wider">Días Tutoriales</CardTitle>
-                                <Sparkles className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-                                    {summaryStats.totalTutorials} días
-                                </div>
-                                <p className="text-xs text-muted-foreground mt-1">Días de formación/tutoriales</p>
+                                <p className="text-xs text-muted-foreground mt-1">Registros en el período</p>
                             </CardContent>
                         </Card>
                     </div>
 
+                    {/* @ts-ignore — BillingTable types updated in Task 3 */}
                     <BillingTable
                         data={billingData}
+                        worklogDefs={worklogDefs}
                         isLoading={isLoadingLogs || isLoadingMembers}
-                        settings={company?.settings}
                     />
                 </>
             )}
