@@ -8,8 +8,9 @@ export const getModules = async (includeInactive = false): Promise<AppModule[]> 
     return response.data;
 };
 
-export const getMyModules = async (): Promise<AppModule[]> => {
-    const response = await api.get<AppModule[]>("/modules/me");
+export const getMyModules = async (companyId?: string): Promise<AppModule[]> => {
+    const params = companyId ? { company_id: companyId } : undefined;
+    const response = await api.get<AppModule[]>("/modules/me", { params });
     return response.data;
 };
 

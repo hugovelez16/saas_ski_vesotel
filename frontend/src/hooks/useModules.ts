@@ -10,12 +10,13 @@ import { AppModule } from "@/lib/types";
  * Uso: const { hasModule } = useModules();
  *      if (hasModule("export_pdf")) { ... }
  */
-export function useModules() {
+export function useModules(companyId?: string) {
     const { user } = useAuth();
+    const activeCompanyId = companyId || user?.activeCompanyId || undefined;
 
     const { data: modules = [], isLoading } = useQuery<AppModule[]>({
-        queryKey: ["myModules", user?.id, user?.activeCompanyId],
-        queryFn: getMyModules,
+        queryKey: ["myModules", user?.id, activeCompanyId],
+        queryFn: () => getMyModules(activeCompanyId),
         enabled: !!user,
         staleTime: 5 * 60 * 1000, // 5 minutos — los módulos cambian poco
     });
