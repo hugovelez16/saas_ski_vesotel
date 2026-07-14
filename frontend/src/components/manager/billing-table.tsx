@@ -1,13 +1,12 @@
 "use client";
 
 import { DataTable } from "@/components/ui/data-table";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
-import { CompanySettings, WorkLog } from "@/lib/types";
+import { WorkLog, DynamicBillingRow } from "@/lib/types";
 import { useState, useMemo } from "react";
 import { BillingBreakdownDialog } from "./billing-breakdown-dialog";
 import { ColumnDef } from "@tanstack/react-table";
 
+/** @deprecated Use DynamicBillingRow from @/lib/types instead */
 export interface BillingRow {
     userId: string;
     userName: string;
@@ -31,76 +30,57 @@ export interface BillingRow {
 }
 
 interface BillingTableProps {
-    data: BillingRow[];
+    data: DynamicBillingRow[];
+    worklogDefs: Record<string, { unit: string; label: string }>;
     isLoading?: boolean;
-    settings?: CompanySettings;
 }
 
-export function BillingTable({ data, isLoading, settings }: BillingTableProps) {
-    const [selectedRow, setSelectedRow] = useState<BillingRow | null>(null);
+export function BillingTable({ data, worklogDefs, isLoading }: BillingTableProps) {
+    const [selectedRow, setSelectedRow] = useState<DynamicBillingRow | null>(null);
 
-    const showTutorials = (settings?.modules?.tutorials ?? settings?.features?.tutorials) !== false;
-    const showCoordination = (settings?.modules?.coordination ?? settings?.features?.coordination) !== false;
-    const showNights = (settings?.modules?.night_shifts ?? settings?.features?.night_shifts) !== false;
-
-    const columns = useMemo<ColumnDef<BillingRow>[]>(() => {
-        const cols: ColumnDef<BillingRow>[] = [
+    const columns = useMemo<ColumnDef<DynamicBillingRow>[]>(() => {
+        const cols: ColumnDef<DynamicBillingRow>[] = [
             {
-                accessorKey: "userName",
-                header: "Nombre del usuario",
+                accessorKey: 'userName',
+                header: 'Nombre del usuario',
                 cell: ({ row }) => (
                     <div className="flex flex-col">
-                        <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">{row.original.userName}</span>
+                        <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                            {row.original.userName}
+                        </span>
                         <span className="text-xs text-muted-foreground">{row.original.userEmail}</span>
                     </div>
-                )
+                ),
             },
+            // Una columna por tipo definido en worklogDefs
+            ...Object.entries(worklogDefs).map(([typeKey, def]) => ({
+                id: typeKey,
+                header: def.label ?? typeKey,
+                cell: ({ row }: { row: { original: DynamicBillingRow } }) => {
+                    const summary = row.original.byType[typeKey];
+                    if (!summary || summary.quantity === 0) {
+                        return <div className="text-right text-muted-foreground">—</div>;
+                    }
+                    const qty = def.unit === 'hours'
+                        ? `${summary.quantity.toFixed(2)} h`
+                        : `${summary.quantity} días`;
+                    return <div className="text-right">{qty}</div>;
+                },
+            } as ColumnDef<DynamicBillingRow>)),
+            // Columna fija Total Bruto (siempre última)
             {
-                accessorKey: "particularHours",
-                header: "Horas Particulares",
-                cell: ({ row }) => <div className="text-right">{row.original.particularHours.toFixed(2)} h</div>
-            }
+                id: 'totalGross',
+                header: 'Total Bruto',
+                cell: ({ row }) => (
+                    <div className="text-right font-bold text-emerald-600 dark:text-emerald-400">
+                        {new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' })
+                            .format(row.original.totalGross || row.original.totalNet)}
+                    </div>
+                ),
+            },
         ];
-
-        if (showTutorials) {
-            cols.push({
-                accessorKey: "tutorialDays",
-                header: "Días Tutoriales",
-                cell: ({ row }) => <div className="text-right">{row.original.tutorialDays}</div>
-            });
-        }
-
-        if (showCoordination) {
-            cols.push({
-                accessorKey: "coordinatedDays",
-                header: "Días Coordinados",
-                cell: ({ row }) => <div className="text-right">{row.original.coordinatedDays}</div>
-            });
-        }
-
-        if (showNights) {
-            cols.push({
-                accessorKey: "nightShifts",
-                header: "Nocturnidades",
-                cell: ({ row }) => <div className="text-right">{row.original.nightShifts}</div>
-            });
-        }
-
-        cols.push({
-            accessorKey: "totalGrossAmount",
-            header: "Total Bruto",
-            cell: ({ row }) => (
-                <div className="text-right font-bold text-emerald-600 dark:text-emerald-400">
-                    {new Intl.NumberFormat("es-ES", {
-                        style: "currency",
-                        currency: "EUR",
-                    }).format(row.original.totalGrossAmount || row.original.totalAmount)}
-                </div>
-            )
-        });
-
         return cols;
-    }, [showTutorials, showCoordination, showNights]);
+    }, [worklogDefs]);
 
     if (isLoading) {
         return <div className="p-8 text-center text-muted-foreground">Cargando facturación...</div>;
@@ -116,10 +96,12 @@ export function BillingTable({ data, isLoading, settings }: BillingTableProps) {
                 searchPlaceholder="Buscar por nombre..."
             />
 
+            {/* @ts-ignore — BillingBreakdownDialog row/worklogDefs types updated in Task 4 */}
             <BillingBreakdownDialog
                 open={!!selectedRow}
                 onOpenChange={(open) => !open && setSelectedRow(null)}
                 row={selectedRow}
+                worklogDefs={worklogDefs}
             />
         </div>
     );

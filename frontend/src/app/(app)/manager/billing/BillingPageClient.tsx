@@ -287,7 +287,6 @@ export default function ManagerBillingPage() {
                         </Card>
                     </div>
 
-                    {/* @ts-ignore — BillingTable types updated in Task 3 */}
                     <BillingTable
                         data={billingData}
                         worklogDefs={worklogDefs}
