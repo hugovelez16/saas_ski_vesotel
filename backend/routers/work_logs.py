@@ -80,7 +80,7 @@ def read_work_logs(
     skip: int = 0, 
     limit: int = 100, 
     user_id: str = None, # Optional filter via query param
-    company_id: str = None, # Optional filter via query param
+    company_id: UUID = None, # Optional filter via query param
     start_date: date = None,
     end_date: date = None,
     db: Session = Depends(get_db), 
