@@ -66,9 +66,9 @@ export default function ManagerBillingPage() {
         // Inicializar con miembros activos
         members.forEach((member: any) => {
             if (!member.user) return;
-            userMap.set(member.user_id, {
+            userMap.set(member.userId, {
                 row: {
-                    userId: member.user_id,
+                    userId: member.userId,
                     userName: `${member.user.firstName || ''} ${member.user.lastName || ''}`.trim() || member.user.email,
                     userEmail: member.user.email,
                     byType: {},

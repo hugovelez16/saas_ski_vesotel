@@ -29,6 +29,15 @@ export function BillingTable({ data, worklogDefs, isLoading }: BillingTableProps
                     </div>
                 ),
             },
+            {
+                id: 'logsCount',
+                header: 'Registros',
+                cell: ({ row }) => (
+                    <div className="text-right font-medium text-slate-500 pr-4">
+                        {row.original.logs.length}
+                    </div>
+                ),
+            },
             // Una columna por tipo definido en worklogDefs
             ...Object.entries(worklogDefs).map(([typeKey, def]) => ({
                 id: typeKey,
