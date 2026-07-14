@@ -6,29 +6,6 @@ import { useState, useMemo } from "react";
 import { BillingBreakdownDialog } from "./billing-breakdown-dialog";
 import { ColumnDef } from "@tanstack/react-table";
 
-/** @deprecated Use DynamicBillingRow from @/lib/types instead */
-export interface BillingRow {
-    userId: string;
-    userName: string;
-    userEmail: string;
-    particularHours: number;
-    particularAmount: number;
-    particularGrossAmount: number;
-    tutorialDays: number;
-    tutorialAmount: number;
-    tutorialGrossAmount: number;
-    coordinatedDays: number;
-    coordinatedAmount: number;
-    coordinatedGrossAmount: number;
-    nightShifts: number;
-    nightAmount: number;
-    nightGrossAmount: number;
-    totalAmount: number;
-    totalGrossAmount: number;
-    rates?: any;
-    logs: WorkLog[];
-}
-
 interface BillingTableProps {
     data: DynamicBillingRow[];
     worklogDefs: Record<string, { unit: string; label: string }>;
