@@ -77,7 +77,7 @@ class TestWorkLogsSupervisorLogic(unittest.TestCase):
         )
         self.db.add(self.log1)
         self.db.add(self.log2)
-        self.db.commit()
+        self.db.flush()
         
         # Set up active company and role contexts on the users
         # manager context
@@ -91,15 +91,7 @@ class TestWorkLogsSupervisorLogic(unittest.TestCase):
         self.user2.is_platform_admin = False
 
     def tearDown(self):
-        # Clean up database records
-        self.db.delete(self.log1)
-        self.db.delete(self.log2)
-        self.db.delete(self.membership1)
-        self.db.delete(self.membership2)
-        self.db.delete(self.user1)
-        self.db.delete(self.user2)
-        self.db.delete(self.company)
-        self.db.commit()
+        self.db.rollback()
         self.db.close()
 
     def test_supervisor_with_explicit_company_id(self):
