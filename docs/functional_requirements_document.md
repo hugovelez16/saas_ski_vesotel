@@ -185,3 +185,115 @@ sequenceDiagram
 ### 6.3. Módulo de Estadísticas Semanales de Turnos (`shifts_statistics`)
 *   **Especificación Planificada:** Inserción del módulo `"shifts_statistics"` en el catálogo SaaS con ámbito `"company"`.
 *   **Visualización en Menú:** Mapeo de la ruta `/manager/shifts-statistics` en el sidebar dinámico, permitiendo a managers visualizar los desgloses semanales de sus empleados (dinero neto o bruto según configuración de la empresa) agrupados por tipo de unidad (Horas, Días o Sesiones Fijas).
+
+---
+
+## 7. Diagrama de Entidad-Relación de la Base de Datos (ERD)
+
+A continuación se detalla la estructura relacional de la base de datos de la plataforma en formato Mermaid:
+
+```mermaid
+erDiagram
+    app_modules {
+        character_varying code_name UK 
+        timestamp_without_time_zone created_at 
+        text description 
+        uuid id PK 
+        boolean is_active 
+        character_varying name 
+        numeric price_monthly 
+        character_varying target_scope 
+        timestamp_without_time_zone updated_at 
+    }
+
+    audit_logs {
+        character_varying action 
+        uuid admin_user_id FK 
+        timestamp_without_time_zone created_at 
+        jsonb extra_data 
+        uuid id PK 
+        uuid impersonated_user_id FK 
+    }
+
+    companies {
+        timestamp_without_time_zone created_at 
+        character_varying fiscal_id 
+        uuid id PK 
+        character_varying name 
+        jsonb settings 
+        jsonb tax_config 
+        timestamp_without_time_zone updated_at 
+        jsonb worklog_definitions 
+    }
+
+    company_members {
+        uuid company_id PK,FK 
+        boolean is_active 
+        timestamp_without_time_zone joined_at 
+        jsonb rates_config 
+        companyrole role 
+        jsonb settings 
+        timestamp_without_time_zone updated_at 
+        uuid user_id PK,FK 
+    }
+
+    module_subscriptions {
+        uuid company_id FK 
+        timestamp_without_time_zone created_at 
+        timestamp_without_time_zone expires_at 
+        uuid id PK 
+        uuid module_id FK 
+        text notes 
+        subscriptionscope scope 
+        subscriptionstatus status 
+        timestamp_without_time_zone updated_at 
+        uuid user_id FK 
+    }
+
+    users {
+        timestamp_without_time_zone created_at 
+        uuid default_company_id FK 
+        character_varying email UK 
+        character_varying first_name 
+        character_varying hashed_password 
+        uuid id PK 
+        boolean is_2fa_enabled 
+        boolean is_active 
+        character_varying last_name 
+        boolean must_change_password 
+        character_varying otp_secret 
+        userrole role 
+        timestamp_without_time_zone updated_at 
+    }
+
+    work_logs {
+        jsonb calculation_snapshot 
+        uuid company_id FK 
+        timestamp_without_time_zone created_at 
+        text description 
+        numeric duration 
+        date end_date 
+        time_without_time_zone end_time 
+        jsonb extra_data 
+        numeric gross_amount 
+        uuid id PK 
+        numeric net_amount 
+        date start_date 
+        time_without_time_zone start_time 
+        character_varying type 
+        timestamp_without_time_zone updated_at 
+        uuid user_id FK 
+    }
+
+    module_subscriptions }o--|| app_modules : "module_id"
+    audit_logs }o--|| users : "admin_user_id"
+    audit_logs }o--|| users : "impersonated_user_id"
+    company_members }o--|| companies : "company_id"
+    module_subscriptions }o--|| companies : "company_id"
+    users }o--|| companies : "default_company_id"
+    work_logs }o--|| companies : "company_id"
+    company_members }o--|| users : "user_id"
+    module_subscriptions }o--|| users : "user_id"
+    work_logs }o--|| users : "user_id"
+```
+
