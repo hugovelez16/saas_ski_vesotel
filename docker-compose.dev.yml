@@ -9,14 +9,13 @@ services:
       - .env
     networks:
       - db
-      - dashboard-db-network
     restart: unless-stopped
 
   backend:
     build: ./backend
+    user: root # Evita conflictos de permisos al generar llaves o migraciones en Linux/WSL
     volumes:
       - ./backend:/app # MODO DEV: Tus cambios de código se reflejan al instante
-      - /app/node_modules
     env_file:
       - .env
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
@@ -65,6 +64,4 @@ networks:
     driver: bridge
     internal: true
   proxy_network:
-    external: true
-  dashboard-db-network:
     external: true

@@ -64,3 +64,6 @@ dump.rdb
 .aider*
 .antigravitycli/
 scratch/
+
+# Llaves locales generadas dinámicamente
+backend/keys/

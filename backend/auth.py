@@ -50,17 +50,65 @@ try:
         encryption_algorithm=serialization.NoEncryption()
     ).decode("utf-8")
 except (FileNotFoundError, ValueError, TypeError) as e:
-    # Fallback for dev/CI if keys don't exist yet (though they should be generated)
-    # In production, keys must be managed securely
+    # Fallback for dev/CI if keys don't exist yet or decryption fails
     PRIVATE_KEY = os.getenv("PRIVATE_KEY", "")
     PUBLIC_KEY = os.getenv("PUBLIC_KEY", "")
     if not PRIVATE_KEY and not PUBLIC_KEY:
-        raise RuntimeError(f"Failed to load RSA key: {e}")
+        try:
+            print("RSA keys not found or failed to load. Generating a new key pair for local development...")
+            from cryptography.hazmat.primitives.asymmetric import rsa
+            from cryptography.hazmat.primitives import serialization
+            from cryptography.hazmat.backends import default_backend
+
+            # Generate new RSA key pair
+            private_key_obj = rsa.generate_private_key(
+                public_exponent=65537,
+                key_size=2048,
+                backend=default_backend()
+            )
+
+            # Serialize key pair (unencrypted for easy local development)
+            pem_private = private_key_obj.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.PKCS8,
+                encryption_algorithm=serialization.NoEncryption()
+            )
+            pem_public = private_key_obj.public_key().public_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PublicFormat.SubjectPublicKeyInfo
+            )
+
+            # Write key pair back to disk to persist across hot-reloads
+            os.makedirs(KEYS_DIR, exist_ok=True)
+            with open(os.path.join(KEYS_DIR, "private_key.pem"), "wb") as f:
+                f.write(pem_private)
+            with open(os.path.join(KEYS_DIR, "public_key.pem"), "wb") as f:
+                f.write(pem_public)
+
+            PRIVATE_KEY = pem_private.decode("utf-8")
+            PUBLIC_KEY = pem_public.decode("utf-8")
+            print("Successfully auto-generated RSA key pair for local development (saved under keys/).")
+        except Exception as gen_err:
+            raise RuntimeError(f"Failed to load RSA key: {e}. Auto-generation also failed: {gen_err}")
 
 from redis_config import redis_manager
 
 # Encryption key for OTP secrets
-ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY", Fernet.generate_key().decode())
+_encryption_key_env = os.getenv("ENCRYPTION_KEY")
+if not _encryption_key_env:
+    ENCRYPTION_KEY = Fernet.generate_key().decode()
+else:
+    # If the key is hex-encoded (64 chars), convert it to url-safe base64 for Fernet
+    if len(_encryption_key_env) == 64:
+        try:
+            import base64
+            raw_key = bytes.fromhex(_encryption_key_env)
+            ENCRYPTION_KEY = base64.urlsafe_b64encode(raw_key).decode()
+        except ValueError:
+            ENCRYPTION_KEY = _encryption_key_env
+    else:
+        ENCRYPTION_KEY = _encryption_key_env
+
 fernet = Fernet(ENCRYPTION_KEY.encode())
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
