@@ -32,7 +32,7 @@ export default function ManagerBillingPage() {
             endDate: date?.to ? format(date.to, 'yyyy-MM-dd') : undefined,
         }),
         queryKey: ["companyBillingSummary", selectedCompanyId, date?.from, date?.to],
-        enabled: !!selectedCompanyId && !!date?.from,
+        enabled: !!selectedCompanyId && !!date?.from && !!date?.to,
     });
 
     // 2. Fetch Company Details for Settings

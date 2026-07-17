@@ -1,7 +1,7 @@
 "use client";
 
 import { DataTable } from "@/components/ui/data-table";
-import { WorkLog, DynamicBillingRow } from "@/lib/types";
+import { DynamicBillingRow } from "@/lib/types";
 import { useState, useMemo } from "react";
 import { BillingBreakdownDialog } from "./billing-breakdown-dialog";
 import { ColumnDef } from "@tanstack/react-table";
