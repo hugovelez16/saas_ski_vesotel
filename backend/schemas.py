@@ -307,3 +307,17 @@ class ModuleSubscriptionResponse(CamelModel):
     user: Optional[UserResponse] = None
 
 
+class BillingSummaryItemResponse(CamelModel):
+    user_id: UUID
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    email: EmailStr
+    type: Optional[str] = None
+    total_hours: float
+    total_net: float
+    total_gross: float
+    unique_days: int
+    logs_count: int
+
+
+

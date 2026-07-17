@@ -157,6 +157,53 @@ def read_work_logs(
     )
     return work_logs
 
+@router.get("/billing-summary", response_model=List[schemas.BillingSummaryItemResponse])
+def get_billing_summary(
+    company_id: UUID,
+    start_date: date,
+    end_date: date,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_verified_user)
+):
+    """
+    Get billing summary for a company, aggregated by user and work log type, using the PostgreSQL database function.
+    Only managers of the company or platform admins can access this.
+    """
+    if not getattr(current_user, "is_platform_admin", False):
+        if not is_manager_of_company(db, current_user, company_id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only managers of this company or platform admins can access the billing summary."
+            )
+            
+    from sqlalchemy import text
+    query = text("""
+        SELECT user_id, first_name, last_name, email, type, 
+               total_hours, total_net, total_gross, unique_days, logs_count
+        FROM get_billing_summary(:company_id, :start_date, :end_date)
+    """)
+    result = db.execute(query, {
+        "company_id": str(company_id),
+        "start_date": start_date,
+        "end_date": end_date
+    }).fetchall()
+    
+    summary = []
+    for row in result:
+        summary.append(schemas.BillingSummaryItemResponse(
+            user_id=row.user_id,
+            first_name=row.first_name,
+            last_name=row.last_name,
+            email=row.email,
+            type=row.type,
+            total_hours=float(row.total_hours or 0.0),
+            total_net=float(row.total_net or 0.0),
+            total_gross=float(row.total_gross or 0.0),
+            unique_days=int(row.unique_days or 0),
+            logs_count=int(row.logs_count or 0)
+        ))
+    return summary
+
 @router.delete("/{work_log_id}")
 def delete_work_log(work_log_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_verified_user)):
     log = db.query(models.WorkLog).filter(models.WorkLog.id == work_log_id).first()
