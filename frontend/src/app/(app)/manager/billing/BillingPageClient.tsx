@@ -2,13 +2,12 @@
 
 import { useState, useMemo } from "react";
 import { DateRange } from "react-day-picker";
-import { startOfMonth, endOfMonth, format, eachDayOfInterval, parseISO, addMonths, subMonths } from "date-fns";
+import { startOfMonth, endOfMonth, format, addMonths, subMonths } from "date-fns";
 import { DateRangeFilter } from "@/components/manager/date-range-filter";
 import { BillingTable } from "@/components/manager/billing-table";
-import { getWorkLogs } from "@/lib/api/work-logs";
-import { getCompanyMembers } from "@/lib/api/companies";
+import { getBillingSummary } from "@/lib/api/work-logs";
 import { useQuery } from "@tanstack/react-query";
-import { WorkLog, DynamicBillingRow } from "@/lib/types";
+import { BillingSummaryItem, DynamicBillingRow } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Download, Coins, Wallet, FileText } from "lucide-react";
@@ -25,26 +24,18 @@ export default function ManagerBillingPage() {
         to: endOfMonth(new Date()),
     });
 
-    // 1. Fetch Work Logs for selected company and date range
-    const { data: workLogs = [], isLoading: isLoadingLogs } = useQuery({
-        queryFn: () => getWorkLogs({
+    // 1. Fetch Billing Summary for selected company and date range
+    const { data: billingItems = [], isLoading: isLoadingBilling } = useQuery({
+        queryFn: () => getBillingSummary({
             companyId: selectedCompanyId!,
             startDate: date?.from ? format(date.from, 'yyyy-MM-dd') : undefined,
             endDate: date?.to ? format(date.to, 'yyyy-MM-dd') : undefined,
-            limit: 1000
         }),
-        queryKey: ["companyWorkLogs", selectedCompanyId, date?.from, date?.to],
+        queryKey: ["companyBillingSummary", selectedCompanyId, date?.from, date?.to],
         enabled: !!selectedCompanyId && !!date?.from,
     });
 
-    // 2. Fetch Company Members
-    const { data: members = [], isLoading: isLoadingMembers } = useQuery({
-        queryFn: () => getCompanyMembers(selectedCompanyId!, 'active'),
-        queryKey: ["companyMembers", selectedCompanyId],
-        enabled: !!selectedCompanyId,
-    });
-
-    // 2b. Fetch Company Details for Settings
+    // 2. Fetch Company Details for Settings
     const { data: company } = useQuery({
         queryFn: async () => (await import("@/lib/api").then(m => m.default.get(`/companies/${selectedCompanyId}`))).data,
         queryKey: ["company", selectedCompanyId],
@@ -56,101 +47,67 @@ export default function ManagerBillingPage() {
         [company]
     );
 
-    // 3. Aggregate Data — dynamic grouping by log.type
+    // 3. Aggregate billingData from flat database rows:
     const billingData: DynamicBillingRow[] = useMemo(() => {
-        if (!workLogs.length) return [];
+        if (!billingItems.length) return [];
 
-        type DateSetMap = Record<string, Set<string>>;
-        const userMap = new Map<string, { row: DynamicBillingRow; dateSets: DateSetMap }>();
+        const userMap = new Map<string, DynamicBillingRow>();
 
-        // Inicializar con miembros activos
-        members.forEach((member: any) => {
-            if (!member.user) return;
-            userMap.set(member.userId, {
-                row: {
-                    userId: member.userId,
-                    userName: `${member.user.firstName || ''} ${member.user.lastName || ''}`.trim() || member.user.email,
-                    userEmail: member.user.email,
+        billingItems.forEach((item: BillingSummaryItem) => {
+            let row = userMap.get(item.userId);
+            if (!row) {
+                row = {
+                    userId: item.userId,
+                    userName: `${item.firstName || ''} ${item.lastName || ''}`.trim() || item.email,
+                    userEmail: item.email,
                     byType: {},
                     totalNet: 0,
                     totalGross: 0,
-                    logs: [],
-                },
-                dateSets: {},
-            });
-        });
-
-        workLogs.forEach((log: WorkLog) => {
-            let agg = userMap.get(log.userId);
-            if (!agg) {
-                agg = {
-                    row: {
-                        userId: log.userId,
-                        userName: 'Unknown',
-                        userEmail: '',
-                        byType: {},
-                        totalNet: 0,
-                        totalGross: 0,
-                        logs: [],
-                    },
-                    dateSets: {},
+                    logsCount: 0,
                 };
-                userMap.set(log.userId, agg);
+                userMap.set(item.userId, row);
             }
 
-            agg.row.logs.push(log);
+            // If the item has a type, add it to byType
+            if (item.type) {
+                const def = worklogDefs[item.type];
+                const unit = def?.unit ?? 'hours';
+                const label = def?.label ?? item.type;
 
-            const def = worklogDefs[log.type];
-            const unit = def?.unit ?? 'hours';
-            const label = def?.label ?? log.type;
+                // Quantity is totalHours if unit is hours, otherwise uniqueDays
+                const quantity = unit === 'hours' ? item.totalHours : item.uniqueDays;
 
-            if (!agg.row.byType[log.type]) {
-                agg.row.byType[log.type] = { typeKey: log.type, label, unit, quantity: 0, netAmount: 0, grossAmount: 0 };
+                row.byType[item.type] = {
+                    typeKey: item.type,
+                    label,
+                    unit,
+                    quantity,
+                    netAmount: item.totalNet,
+                    grossAmount: item.totalGross,
+                };
+
+                row.totalNet += item.totalNet;
+                row.totalGross += item.totalGross;
+                row.logsCount += item.logsCount;
             }
-            if (unit === 'days' && !agg.dateSets[log.type]) {
-                agg.dateSets[log.type] = new Set<string>();
-            }
-
-            const summary = agg.row.byType[log.type];
-
-            if (unit === 'hours') {
-                summary.quantity += Number(log.duration ?? 0);
-            } else {
-                // Acumular días únicos en el intervalo
-                try {
-                    eachDayOfInterval({ start: parseISO(log.startDate), end: parseISO(log.endDate) })
-                        .forEach(d => agg!.dateSets[log.type].add(format(d, 'yyyy-MM-dd')));
-                } catch {}
-            }
-
-            summary.netAmount += Number(log.netAmount ?? 0);
-            summary.grossAmount += Number(log.grossAmount ?? 0);
-            agg.row.totalNet += Number(log.netAmount ?? 0);
-            agg.row.totalGross += Number(log.grossAmount ?? 0);
         });
 
-        // Resolver cantidades para tipos "days"
-        return Array.from(userMap.values()).map(({ row, dateSets }) => {
-            Object.keys(dateSets).forEach(typeKey => {
-                if (row.byType[typeKey]) {
-                    row.byType[typeKey].quantity = dateSets[typeKey].size;
-                }
-            });
-            return row;
-        });
-    }, [workLogs, members, worklogDefs]);
+        return Array.from(userMap.values());
+    }, [billingItems, worklogDefs]);
 
     const summaryStats = useMemo(() => {
         let totalGross = 0;
         let totalNet = 0;
+        let totalLogs = 0;
 
         billingData.forEach(row => {
             totalGross += row.totalGross;
             totalNet += row.totalNet;
+            totalLogs += row.logsCount;
         });
 
-        return { totalGross, totalNet, totalLogs: workLogs.length };
-    }, [billingData, workLogs.length]);
+        return { totalGross, totalNet, totalLogs };
+    }, [billingData]);
 
     const handleExportCsv = () => {
         if (billingData.length === 0) return;
@@ -290,7 +247,7 @@ export default function ManagerBillingPage() {
                     <BillingTable
                         data={billingData}
                         worklogDefs={worklogDefs}
-                        isLoading={isLoadingLogs || isLoadingMembers}
+                        isLoading={isLoadingBilling}
                     />
                 </>
             )}

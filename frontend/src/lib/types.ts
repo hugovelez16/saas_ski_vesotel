@@ -267,6 +267,19 @@ export interface WorklogTypeSummary {
     grossAmount: number;
 }
 
+export interface BillingSummaryItem {
+    userId: string;
+    firstName: string | null;
+    lastName: string | null;
+    email: string;
+    type: string | null;
+    totalHours: number;
+    totalNet: number;
+    totalGross: number;
+    uniqueDays: number;
+    logsCount: number;
+}
+
 export interface DynamicBillingRow {
     userId: string;
     userName: string;
@@ -274,5 +287,6 @@ export interface DynamicBillingRow {
     byType: Record<string, WorklogTypeSummary>;  // typeKey → summary
     totalNet: number;
     totalGross: number;
-    logs: WorkLog[];
+    logsCount: number;
 }
+

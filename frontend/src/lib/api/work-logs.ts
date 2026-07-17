@@ -1,5 +1,5 @@
 import api from '../api';
-import { WorkLog, WorkLogCreate } from '@/lib/types';
+import { WorkLog, WorkLogCreate, BillingSummaryItem } from '@/lib/types';
 
 export const getWorkLogs = async (params?: {
     companyId?: string;
@@ -20,6 +20,21 @@ export const getWorkLogs = async (params?: {
     const response = await api.get('/work-logs', { params: apiParams });
     return response.data;
 };
+
+export const getBillingSummary = async (params: {
+    companyId: string;
+    startDate?: string;
+    endDate?: string;
+}): Promise<BillingSummaryItem[]> => {
+    const apiParams = {
+        company_id: params.companyId,
+        start_date: params.startDate,
+        end_date: params.endDate
+    };
+    const response = await api.get('/work-logs/billing-summary', { params: apiParams });
+    return response.data;
+};
+
 
 export const createWorkLog = async (data: WorkLogCreate): Promise<WorkLog> => {
     const response = await api.post('/work-logs', data);

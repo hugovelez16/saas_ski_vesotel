@@ -34,7 +34,7 @@ export function BillingTable({ data, worklogDefs, isLoading }: BillingTableProps
                 header: 'Registros',
                 cell: ({ row }) => (
                     <div className="text-right font-medium text-slate-500 pr-4">
-                        {row.original.logs.length}
+                        {row.original.logsCount}
                     </div>
                 ),
             },
