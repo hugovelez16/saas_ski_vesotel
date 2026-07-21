@@ -67,3 +67,7 @@ scratch/
 
 # Llaves locales generadas dinámicamente
 backend/keys/
+
+# Antigravity / IA
+.superpowers/
+*.tsbuildinfo
